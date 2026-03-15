@@ -1,248 +1,233 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { demo2Transport } from '../api/transport'
-import { ArticleServiceClient } from '../rpc/demo2/article/article.client'
-import {
-    CreateArticleRequest,
-    UpdateArticleRequest,
-    DeleteArticleRequest,
-    GetArticleRequest,
-    ListArticlesRequest,
-} from '../rpc/demo2/article/article'
-import type { ArticleInfo } from '../rpc/demo2/article/article'
+import { sdk文章管理 } from '../sdk'
+import type { T文章信息 } from '../sdk'
 import { showErrorDialog } from '../utils/error'
 import { showSuccess } from '../utils/message'
 
-const client = new ArticleServiceClient(demo2Transport)
+const a文章列表 = ref<T文章信息[]>([])
+const a日志 = ref<string[]>([])
+const ref日志框 = ref<HTMLElement | null>(null)
+const b加载中 = ref(false)
 
-const articles = ref<ArticleInfo[]>([])
-const logs = ref<string[]>([])
-const logBox = ref<HTMLElement | null>(null)
-const loading = ref(false)
-
-// create dialog
-const showCreateDialog = ref(false)
-const createFormRef = ref<FormInstance>()
-const createForm = reactive({ title: '', content: '', studentId: '' })
-const createRules = reactive<FormRules>({
-    title: [{ required: true, message: 'Title is required', trigger: 'blur' }],
+// 创建弹窗
+const b显示创建弹窗 = ref(false)
+const ref创建表单 = ref<FormInstance>()
+const v创建表单 = reactive({ v标题: '', v内容: '', v学生编号: '' })
+const v创建规则 = reactive<FormRules>({
+    v标题: [{ required: true, message: '标题不能为空', trigger: 'blur' }],
 })
 
-// update dialog
-const showUpdateDialog = ref(false)
-const updateFormRef = ref<FormInstance>()
-const updateForm = reactive({ id: '', title: '', content: '', studentId: '' })
-const updateRules = reactive<FormRules>({
-    title: [{ required: true, message: 'Title is required', trigger: 'blur' }],
+// 更新弹窗
+const b显示更新弹窗 = ref(false)
+const ref更新表单 = ref<FormInstance>()
+const v更新表单 = reactive({ v编号: '', v标题: '', v内容: '', v学生编号: '' })
+const v更新规则 = reactive<FormRules>({
+    v标题: [{ required: true, message: '标题不能为空', trigger: 'blur' }],
 })
 
-function log(msg: string) {
-    logs.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
-    if (logs.value.length > 50) logs.value.shift()
+function act记录日志(msg: string) {
+    a日志.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
+    if (a日志.value.length > 50) a日志.value.shift()
     nextTick(() => {
-        if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight
+        if (ref日志框.value) ref日志框.value.scrollTop = ref日志框.value.scrollHeight
     })
 }
 
-function openCreate() {
-    createForm.title = ''
-    createForm.content = ''
-    createForm.studentId = ''
-    showCreateDialog.value = true
-    nextTick(() => createFormRef.value?.clearValidate())
+function act打开创建弹窗() {
+    v创建表单.v标题 = ''
+    v创建表单.v内容 = ''
+    v创建表单.v学生编号 = ''
+    b显示创建弹窗.value = true
+    nextTick(() => ref创建表单.value?.clearValidate())
 }
 
-async function doCreate() {
-    const valid = await createFormRef.value?.validate().catch(() => false)
+async function act创建文章() {
+    const valid = await ref创建表单.value?.validate().catch(() => false)
     if (!valid) return
-    loading.value = true
+    b加载中.value = true
     try {
-        const request = CreateArticleRequest.create({
-            title: createForm.title.trim(),
-            content: createForm.content.trim(),
-            studentId: createForm.studentId.trim() || '0',
+        const res = await sdk文章管理.act创建文章({
+            v标题: v创建表单.v标题.trim(),
+            v内容: v创建表单.v内容.trim(),
+            v学生编号: v创建表单.v学生编号.trim() || '0',
         })
-        const response = await client.createArticle(request, {})
-        const a = response.data.article
-        showSuccess(`Created: id=${a?.id}, title=${a?.title}`)
-        log(`Created: id=${a?.id}, title=${a?.title}`)
-        await doList()
-        showCreateDialog.value = false
+        const a = res.s文章
+        showSuccess(`创建成功: 编号=${a?.s编号}, 标题=${a?.s标题}`)
+        act记录日志(`创建成功: 编号=${a?.s编号}, 标题=${a?.s标题}`)
+        await act刷新列表()
+        b显示创建弹窗.value = false
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Create FAIL: ${caught}`)
+        act记录日志(`创建失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-function openUpdate(a: ArticleInfo) {
-    updateForm.id = a.id
-    updateForm.title = a.title
-    updateForm.content = a.content
-    updateForm.studentId = a.studentId
-    showUpdateDialog.value = true
-    nextTick(() => updateFormRef.value?.clearValidate())
+function act打开更新弹窗(a: T文章信息) {
+    v更新表单.v编号 = a.s编号
+    v更新表单.v标题 = a.s标题
+    v更新表单.v内容 = a.s内容
+    v更新表单.v学生编号 = a.s学生编号
+    b显示更新弹窗.value = true
+    nextTick(() => ref更新表单.value?.clearValidate())
 }
 
-async function doUpdate() {
-    const valid = await updateFormRef.value?.validate().catch(() => false)
+async function act更新文章() {
+    const valid = await ref更新表单.value?.validate().catch(() => false)
     if (!valid) return
-    loading.value = true
+    b加载中.value = true
     try {
-        const request = UpdateArticleRequest.create({
-            id: updateForm.id,
-            title: updateForm.title.trim(),
-            content: updateForm.content.trim(),
-            studentId: updateForm.studentId.trim() || '0',
+        const res = await sdk文章管理.act更新文章({
+            v编号: v更新表单.v编号,
+            v标题: v更新表单.v标题.trim(),
+            v内容: v更新表单.v内容.trim(),
+            v学生编号: v更新表单.v学生编号.trim() || '0',
         })
-        const response = await client.updateArticle(request, {})
-        const a = response.data.article
-        showSuccess(`Updated: id=${a?.id}, title=${a?.title}`)
-        log(`Updated: id=${a?.id}, title=${a?.title}`)
-        await doList()
-        showUpdateDialog.value = false
+        const a = res.s文章
+        showSuccess(`更新成功: 编号=${a?.s编号}, 标题=${a?.s标题}`)
+        act记录日志(`更新成功: 编号=${a?.s编号}, 标题=${a?.s标题}`)
+        await act刷新列表()
+        b显示更新弹窗.value = false
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Update FAIL: ${caught}`)
+        act记录日志(`更新失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-async function doList() {
-    loading.value = true
+async function act刷新列表() {
+    b加载中.value = true
     try {
-        const request = ListArticlesRequest.create({})
-        const response = await client.listArticles(request, {})
-        articles.value = response.data.articles
-        log(`Loaded ${response.data.articles.length} articles`)
+        const res = await sdk文章管理.act文章列表({ v页码: 0, v每页数量: 0 })
+        a文章列表.value = res.s文章列表
+        act记录日志(`加载 ${res.s文章列表.length} 条文章记录`)
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`List FAIL: ${caught}`)
+        act记录日志(`列表加载失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-async function doGet(id: string) {
-    loading.value = true
+async function act查看文章(v编号: string) {
+    b加载中.value = true
     try {
-        const request = GetArticleRequest.create({ id })
-        const response = await client.getArticle(request, {})
-        const a = response.data.article
-        log(`Get: id=${a?.id}, title=${a?.title}, content=${a?.content}, studentId=${a?.studentId}`)
+        const res = await sdk文章管理.act获取文章({ v编号 })
+        const a = res.s文章
+        act记录日志(`查询: 编号=${a?.s编号}, 标题=${a?.s标题}, 内容=${a?.s内容}, 学生编号=${a?.s学生编号}`)
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Get FAIL: ${caught}`)
+        act记录日志(`查询失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
 onMounted(() => {
-    doList()
+    act刷新列表()
 })
 
-async function doDelete(id: string) {
-    loading.value = true
+async function act删除文章(v编号: string) {
+    b加载中.value = true
     try {
-        const request = DeleteArticleRequest.create({ id })
-        await client.deleteArticle(request, {})
-        showSuccess(`Deleted: id=${id}`)
-        log(`Deleted: id=${id}`)
-        await doList()
+        await sdk文章管理.act删除文章({ v编号 })
+        showSuccess(`删除成功: 编号=${v编号}`)
+        act记录日志(`删除成功: 编号=${v编号}`)
+        await act刷新列表()
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Delete FAIL: ${caught}`)
+        act记录日志(`删除失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 </script>
 
 <template>
     <div class="demo-section">
         <div class="section-title">
-            <h2>ArticleService</h2>
+            <h2>文章服务</h2>
             <span class="port">(demo2kratos :8002)</span>
         </div>
 
-        <!-- Article List -->
+        <!-- 文章列表 -->
         <div class="list-card">
             <div class="list-header">
-                <h3>Articles</h3>
+                <h3>文章列表</h3>
                 <div class="header-actions">
-                    <el-button type="primary" @click="openCreate" :loading="loading" size="small">Create</el-button>
-                    <el-button @click="doList" :loading="loading" size="small">Refresh</el-button>
+                    <el-button type="primary" @click="act打开创建弹窗" :loading="b加载中" size="small">创建</el-button>
+                    <el-button @click="act刷新列表" :loading="b加载中" size="small">刷新</el-button>
                 </div>
             </div>
-            <el-table :data="articles" v-loading="loading" stripe border v-if="articles.length > 0">
-                <el-table-column prop="id" label="ID" width="80" align="center" />
-                <el-table-column prop="title" label="Title" align="center" />
-                <el-table-column prop="content" label="Content" align="center" show-overflow-tooltip />
-                <el-table-column label="Student" width="100" align="center">
+            <el-table :data="a文章列表" v-loading="b加载中" stripe border v-if="a文章列表.length > 0">
+                <el-table-column prop="s编号" label="编号" width="80" align="center" />
+                <el-table-column prop="s标题" label="标题" align="center" />
+                <el-table-column prop="s内容" label="内容" align="center" show-overflow-tooltip />
+                <el-table-column label="学生" width="100" align="center">
                     <template #default="{ row }">
-                        {{ row.studentId !== '0' ? row.studentId : '-' }}
+                        {{ row.s学生编号 !== '0' ? row.s学生编号 : '-' }}
                     </template>
                 </el-table-column>
-                <el-table-column label="Actions" width="260" align="center">
+                <el-table-column label="操作" width="260" align="center">
                     <template #default="{ row }">
-                        <el-button size="small" @click="doGet(row.id)" :disabled="loading">Select</el-button>
-                        <el-button size="small" @click="openUpdate(row)" :disabled="loading">Update</el-button>
-                        <el-button size="small" type="danger" @click="doDelete(row.id)" :disabled="loading"
-                            >Delete</el-button
+                        <el-button size="small" @click="act查看文章(row.s编号)" :disabled="b加载中">查看</el-button>
+                        <el-button size="small" @click="act打开更新弹窗(row)" :disabled="b加载中">编辑</el-button>
+                        <el-button size="small" type="danger" @click="act删除文章(row.s编号)" :disabled="b加载中"
+                            >删除</el-button
                         >
                     </template>
                 </el-table-column>
             </el-table>
-            <div v-else class="empty-hint">No articles yet. Click Create to add one.</div>
+            <div v-else class="empty-hint">暂无文章记录，点击创建添加</div>
         </div>
 
-        <!-- Create Dialog -->
-        <el-dialog v-model="showCreateDialog" title="Create Article" width="420" :close-on-click-modal="false">
-            <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="90px">
-                <el-form-item label="Title" prop="title">
-                    <el-input v-model="createForm.title" placeholder="Title" />
+        <!-- 创建弹窗 -->
+        <el-dialog v-model="b显示创建弹窗" title="创建文章" width="420" :close-on-click-modal="false">
+            <el-form ref="ref创建表单" :model="v创建表单" :rules="v创建规则" label-width="90px">
+                <el-form-item label="标题" prop="v标题">
+                    <el-input v-model="v创建表单.v标题" placeholder="请输入标题" />
                 </el-form-item>
-                <el-form-item label="Content" prop="content">
-                    <el-input v-model="createForm.content" type="textarea" placeholder="Content" :rows="3" />
+                <el-form-item label="内容" prop="v内容">
+                    <el-input v-model="v创建表单.v内容" type="textarea" placeholder="请输入内容" :rows="3" />
                 </el-form-item>
-                <el-form-item label="Student ID" prop="studentId">
-                    <el-input v-model="createForm.studentId" placeholder="Student ID (optional)" />
+                <el-form-item label="学生编号" prop="v学生编号">
+                    <el-input v-model="v创建表单.v学生编号" placeholder="学生编号（可选）" />
                 </el-form-item>
             </el-form>
             <template #footer>
-                <el-button @click="showCreateDialog = false">Cancel</el-button>
-                <el-button type="primary" @click="doCreate" :loading="loading">Submit</el-button>
+                <el-button @click="b显示创建弹窗 = false">取消</el-button>
+                <el-button type="primary" @click="act创建文章" :loading="b加载中">提交</el-button>
             </template>
         </el-dialog>
 
-        <!-- Update Dialog -->
+        <!-- 更新弹窗 -->
         <el-dialog
-            v-model="showUpdateDialog"
-            :title="`Update Article (ID: ${updateForm.id})`"
+            v-model="b显示更新弹窗"
+            :title="`更新文章 (编号: ${v更新表单.v编号})`"
             width="420"
             :close-on-click-modal="false"
         >
-            <el-form ref="updateFormRef" :model="updateForm" :rules="updateRules" label-width="90px">
-                <el-form-item label="Title" prop="title">
-                    <el-input v-model="updateForm.title" placeholder="Title" />
+            <el-form ref="ref更新表单" :model="v更新表单" :rules="v更新规则" label-width="90px">
+                <el-form-item label="标题" prop="v标题">
+                    <el-input v-model="v更新表单.v标题" placeholder="请输入标题" />
                 </el-form-item>
-                <el-form-item label="Content" prop="content">
-                    <el-input v-model="updateForm.content" type="textarea" placeholder="Content" :rows="3" />
+                <el-form-item label="内容" prop="v内容">
+                    <el-input v-model="v更新表单.v内容" type="textarea" placeholder="请输入内容" :rows="3" />
                 </el-form-item>
-                <el-form-item label="Student ID" prop="studentId">
-                    <el-input v-model="updateForm.studentId" placeholder="Student ID (optional)" />
+                <el-form-item label="学生编号" prop="v学生编号">
+                    <el-input v-model="v更新表单.v学生编号" placeholder="学生编号（可选）" />
                 </el-form-item>
             </el-form>
             <template #footer>
-                <el-button @click="showUpdateDialog = false">Cancel</el-button>
-                <el-button type="primary" @click="doUpdate" :loading="loading">Submit</el-button>
+                <el-button @click="b显示更新弹窗 = false">取消</el-button>
+                <el-button type="primary" @click="act更新文章" :loading="b加载中">提交</el-button>
             </template>
         </el-dialog>
 
-        <!-- Logs -->
+        <!-- 日志 -->
         <details class="log-section">
-            <summary>Logs ({{ logs.length }})</summary>
-            <div class="log-output" ref="logBox">
-                <div v-for="(line, i) in logs" :key="i" class="log-line">{{ line }}</div>
+            <summary>日志 ({{ a日志.length }})</summary>
+            <div class="log-output" ref="ref日志框">
+                <div v-for="(line, i) in a日志" :key="i" class="log-line">{{ line }}</div>
             </div>
         </details>
     </div>

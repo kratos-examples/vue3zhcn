@@ -9,16 +9,16 @@ const activeTab = ref('student')
 <template>
     <div class="app">
         <div class="app-header">
-            <h1>Vue3 + Kratos Demo</h1>
-            <p class="subtitle">gRPC-to-HTTP integration via protobuf-ts</p>
+            <h1>Vue3 + Kratos 中文编程示例</h1>
+            <p class="subtitle">gRPC-to-HTTP 前后端全链路汉化</p>
         </div>
 
         <el-card class="main-card" shadow="always">
             <el-tabs v-model="activeTab">
-                <el-tab-pane label="StudentService" name="student">
+                <el-tab-pane label="学生服务" name="student">
                     <StudentDemo />
                 </el-tab-pane>
-                <el-tab-pane label="ArticleService" name="article">
+                <el-tab-pane label="文章服务" name="article">
                     <ArticleDemo />
                 </el-tab-pane>
             </el-tabs>

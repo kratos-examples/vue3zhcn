@@ -17,29 +17,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type Article struct {
-	ID        int64
-	Title     string
-	Content   string
-	StudentID int64
+type Req文章信息 struct {
+	ID   int64
+	V标题   string
+	V内容   string
+	V学生编号 int64
 }
 
-type ArticleUsecase struct {
+type Uc文章管理 struct {
 	data *data.Data
-	repo *gormrepo.Repo[models.T文章, *models.T文章Columns]
+	repo文章 *gormrepo.Repo[models.T文章, *models.T文章Columns]
 	log  *log.Helper
 }
 
-func NewArticleUsecase(data *data.Data, logger log.Logger) *ArticleUsecase {
-	return &ArticleUsecase{
+func NewUc文章管理(data *data.Data, logger log.Logger) *Uc文章管理 {
+	return &Uc文章管理{
 		data: data,
-		repo: gormrepo.NewRepo(gormclass.Use(&models.T文章{})),
+		repo文章: gormrepo.NewRepo(gormclass.Use(&models.T文章{})),
 		log:  log.NewHelper(logger),
 	}
 }
 
-func (uc *ArticleUsecase) CreateArticle(ctx context.Context, a *Article) (*Article, *ebzkratos.Ebz) {
-	must.Nice(a.Title)
+func (uc *Uc文章管理) Xqt创建文章(ctx context.Context, req *Req文章信息) (*Req文章信息, *ebzkratos.Ebz) {
+	must.Nice(req.V标题)
 
 	db := uc.data.DB()
 
@@ -47,11 +47,11 @@ func (uc *ArticleUsecase) CreateArticle(ctx context.Context, a *Article) (*Artic
 
 	if erk, err := gormkratos.Transaction(ctx, db, func(db *gorm.DB) *errors.Error {
 		v文章 = &models.T文章{
-			V标题:   a.Title,
-			V内容:   a.Content,
-			V学生编号: a.StudentID,
+			V标题:   req.V标题,
+			V内容:   req.V内容,
+			V学生编号: req.V学生编号,
 		}
-		if err := uc.repo.With(ctx, db).Create(v文章); err != nil {
+		if err := uc.repo文章.With(ctx, db).Create(v文章); err != nil {
 			return errors.New(500, "DB_ERROR", err.Error())
 		}
 		return nil
@@ -61,37 +61,37 @@ func (uc *ArticleUsecase) CreateArticle(ctx context.Context, a *Article) (*Artic
 		}
 		return nil, ebzkratos.New(pb.ErrorServerError("tx: %v", err))
 	}
-	return &Article{
-		ID:        int64(v文章.ID),
-		Title:     v文章.V标题,
-		Content:   v文章.V内容,
-		StudentID: v文章.V学生编号,
+	return &Req文章信息{
+		ID:   int64(v文章.ID),
+		V标题:   v文章.V标题,
+		V内容:   v文章.V内容,
+		V学生编号: v文章.V学生编号,
 	}, nil
 }
 
-func (uc *ArticleUsecase) UpdateArticle(ctx context.Context, a *Article) (*Article, *ebzkratos.Ebz) {
-	must.True(a.ID > 0)
-	must.Nice(a.Title)
+func (uc *Uc文章管理) Xqt更新文章(ctx context.Context, req *Req文章信息) (*Req文章信息, *ebzkratos.Ebz) {
+	must.True(req.ID > 0)
+	must.Nice(req.V标题)
 
 	db := uc.data.DB()
 
-	if err := uc.repo.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-		return db.Where(cls.ID.Eq(uint(a.ID)))
+	if err := uc.repo文章.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
+		return db.Where(cls.ID.Eq(uint(req.ID)))
 	}, func(cls *models.T文章Columns) gormcnm.ColumnValueMap {
-		return cls.Kw(cls.V标题.Kv(a.Title)).Kw(cls.V内容.Kv(a.Content)).Kw(cls.V学生编号.Kv(a.StudentID))
+		return cls.Kw(cls.V标题.Kv(req.V标题)).Kw(cls.V内容.Kv(req.V内容)).Kw(cls.V学生编号.Kv(req.V学生编号))
 	}); err != nil {
 		return nil, ebzkratos.New(pb.ErrorServerError("update: %v", err))
 	}
 
-	return a, nil
+	return req, nil
 }
 
-func (uc *ArticleUsecase) DeleteArticle(ctx context.Context, id int64) *ebzkratos.Ebz {
+func (uc *Uc文章管理) Xqt删除文章(ctx context.Context, id int64) *ebzkratos.Ebz {
 	must.True(id > 0)
 
 	db := uc.data.DB()
 
-	if err := uc.repo.With(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
+	if err := uc.repo文章.With(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 		return db.Where(cls.ID.Eq(uint(id)))
 	}); err != nil {
 		return ebzkratos.New(pb.ErrorServerError("delete: %v", err))
@@ -99,12 +99,12 @@ func (uc *ArticleUsecase) DeleteArticle(ctx context.Context, id int64) *ebzkrato
 	return nil
 }
 
-func (uc *ArticleUsecase) GetArticle(ctx context.Context, id int64) (*Article, *ebzkratos.Ebz) {
+func (uc *Uc文章管理) Get获取文章(ctx context.Context, id int64) (*Req文章信息, *ebzkratos.Ebz) {
 	must.True(id > 0)
 
 	db := uc.data.DB()
 
-	v文章, erb := uc.repo.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
+	v文章, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 		return db.Where(cls.ID.Eq(uint(id)))
 	})
 	if erb != nil {
@@ -114,32 +114,32 @@ func (uc *ArticleUsecase) GetArticle(ctx context.Context, id int64) (*Article, *
 		return nil, ebzkratos.New(pb.ErrorServerError("db: %v", erb.Cause))
 	}
 
-	return &Article{
-		ID:        int64(v文章.ID),
-		Title:     v文章.V标题,
-		Content:   v文章.V内容,
-		StudentID: v文章.V学生编号,
+	return &Req文章信息{
+		ID:   int64(v文章.ID),
+		V标题:   v文章.V标题,
+		V内容:   v文章.V内容,
+		V学生编号: v文章.V学生编号,
 	}, nil
 }
 
-func (uc *ArticleUsecase) ListArticles(ctx context.Context, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
+func (uc *Uc文章管理) Get文章列表(ctx context.Context, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
 	db := uc.data.DB()
 
-	v文章们, err := uc.repo.With(ctx, db).Find(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
+	v文章们, err := uc.repo文章.With(ctx, db).Find(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 		return db.Order(cls.ID.Ob("DESC").Ox())
 	})
 	if err != nil {
 		return nil, 0, ebzkratos.New(pb.ErrorServerError("list: %v", err))
 	}
 
-	items := make([]*Article, 0, len(v文章们))
+	a文章列表 := make([]*Req文章信息, 0, len(v文章们))
 	for _, v := range v文章们 {
-		items = append(items, &Article{
-			ID:        int64(v.ID),
-			Title:     v.V标题,
-			Content:   v.V内容,
-			StudentID: v.V学生编号,
+		a文章列表 = append(a文章列表, &Req文章信息{
+			ID:   int64(v.ID),
+			V标题:   v.V标题,
+			V内容:   v.V内容,
+			V学生编号: v.V学生编号,
 		})
 	}
-	return items, int32(len(items)), nil
+	return a文章列表, int32(len(a文章列表)), nil
 }

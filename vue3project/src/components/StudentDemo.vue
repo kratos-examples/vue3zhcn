@@ -1,244 +1,229 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { demo1Transport } from '../api/transport'
-import { StudentServiceClient } from '../rpc/demo1/student/student.client'
-import {
-    CreateStudentRequest,
-    UpdateStudentRequest,
-    DeleteStudentRequest,
-    GetStudentRequest,
-    ListStudentsRequest,
-} from '../rpc/demo1/student/student'
-import type { StudentInfo } from '../rpc/demo1/student/student'
+import { sdk学生管理 } from '../sdk'
+import type { T学生信息 } from '../sdk'
 import { showErrorDialog } from '../utils/error'
 import { showSuccess } from '../utils/message'
 
-const client = new StudentServiceClient(demo1Transport)
+const a学生列表 = ref<T学生信息[]>([])
+const a日志 = ref<string[]>([])
+const ref日志框 = ref<HTMLElement | null>(null)
+const b加载中 = ref(false)
 
-const students = ref<StudentInfo[]>([])
-const logs = ref<string[]>([])
-const logBox = ref<HTMLElement | null>(null)
-const loading = ref(false)
-
-// create dialog
-const showCreateDialog = ref(false)
-const createFormRef = ref<FormInstance>()
-const createForm = reactive({ name: '', age: 18, className: '' })
-const createRules = reactive<FormRules>({
-    name: [{ required: true, message: 'Name is required', trigger: 'blur' }],
+// 创建弹窗
+const b显示创建弹窗 = ref(false)
+const ref创建表单 = ref<FormInstance>()
+const v创建表单 = reactive({ v名字: '', v年龄: 18, v班级: '' })
+const v创建规则 = reactive<FormRules>({
+    v名字: [{ required: true, message: '名字不能为空', trigger: 'blur' }],
 })
 
-// update dialog
-const showUpdateDialog = ref(false)
-const updateFormRef = ref<FormInstance>()
-const updateForm = reactive({ id: '', name: '', age: 0, className: '' })
-const updateRules = reactive<FormRules>({
-    name: [{ required: true, message: 'Name is required', trigger: 'blur' }],
+// 更新弹窗
+const b显示更新弹窗 = ref(false)
+const ref更新表单 = ref<FormInstance>()
+const v更新表单 = reactive({ v编号: '', v名字: '', v年龄: 0, v班级: '' })
+const v更新规则 = reactive<FormRules>({
+    v名字: [{ required: true, message: '名字不能为空', trigger: 'blur' }],
 })
 
-function log(msg: string) {
-    logs.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
-    if (logs.value.length > 50) logs.value.shift()
+function act记录日志(msg: string) {
+    a日志.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
+    if (a日志.value.length > 50) a日志.value.shift()
     nextTick(() => {
-        if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight
+        if (ref日志框.value) ref日志框.value.scrollTop = ref日志框.value.scrollHeight
     })
 }
 
-function openCreate() {
-    createForm.name = ''
-    createForm.age = 18
-    createForm.className = ''
-    showCreateDialog.value = true
-    nextTick(() => createFormRef.value?.clearValidate())
+function act打开创建弹窗() {
+    v创建表单.v名字 = ''
+    v创建表单.v年龄 = 18
+    v创建表单.v班级 = ''
+    b显示创建弹窗.value = true
+    nextTick(() => ref创建表单.value?.clearValidate())
 }
 
-async function doCreate() {
-    const valid = await createFormRef.value?.validate().catch(() => false)
+async function act创建学生() {
+    const valid = await ref创建表单.value?.validate().catch(() => false)
     if (!valid) return
-    loading.value = true
+    b加载中.value = true
     try {
-        const request = CreateStudentRequest.create({
-            name: createForm.name.trim(),
-            age: createForm.age,
-            className: createForm.className.trim(),
+        const res = await sdk学生管理.act创建学生({
+            v名字: v创建表单.v名字.trim(),
+            v年龄: v创建表单.v年龄,
+            v班级: v创建表单.v班级.trim(),
         })
-        const response = await client.createStudent(request, {})
-        const s = response.data.student
-        showSuccess(`Created: id=${s?.id}, name=${s?.name}`)
-        log(`Created: id=${s?.id}, name=${s?.name}`)
-        await doList()
-        showCreateDialog.value = false
+        const s = res.s学生
+        showSuccess(`创建成功: 编号=${s?.s编号}, 名字=${s?.s名字}`)
+        act记录日志(`创建成功: 编号=${s?.s编号}, 名字=${s?.s名字}`)
+        await act刷新列表()
+        b显示创建弹窗.value = false
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Create FAIL: ${caught}`)
+        act记录日志(`创建失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-function openUpdate(s: StudentInfo) {
-    updateForm.id = s.id
-    updateForm.name = s.name
-    updateForm.age = s.age
-    updateForm.className = s.className
-    showUpdateDialog.value = true
-    nextTick(() => updateFormRef.value?.clearValidate())
+function act打开更新弹窗(s: T学生信息) {
+    v更新表单.v编号 = s.s编号
+    v更新表单.v名字 = s.s名字
+    v更新表单.v年龄 = s.s年龄
+    v更新表单.v班级 = s.s班级
+    b显示更新弹窗.value = true
+    nextTick(() => ref更新表单.value?.clearValidate())
 }
 
-async function doUpdate() {
-    const valid = await updateFormRef.value?.validate().catch(() => false)
+async function act更新学生() {
+    const valid = await ref更新表单.value?.validate().catch(() => false)
     if (!valid) return
-    loading.value = true
+    b加载中.value = true
     try {
-        const request = UpdateStudentRequest.create({
-            id: updateForm.id,
-            name: updateForm.name.trim(),
-            age: updateForm.age,
-            className: updateForm.className.trim(),
+        const res = await sdk学生管理.act更新学生({
+            v编号: v更新表单.v编号,
+            v名字: v更新表单.v名字.trim(),
+            v年龄: v更新表单.v年龄,
+            v班级: v更新表单.v班级.trim(),
         })
-        const response = await client.updateStudent(request, {})
-        const s = response.data.student
-        showSuccess(`Updated: id=${s?.id}, name=${s?.name}`)
-        log(`Updated: id=${s?.id}, name=${s?.name}`)
-        await doList()
-        showUpdateDialog.value = false
+        const s = res.s学生
+        showSuccess(`更新成功: 编号=${s?.s编号}, 名字=${s?.s名字}`)
+        act记录日志(`更新成功: 编号=${s?.s编号}, 名字=${s?.s名字}`)
+        await act刷新列表()
+        b显示更新弹窗.value = false
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Update FAIL: ${caught}`)
+        act记录日志(`更新失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-async function doList() {
-    loading.value = true
+async function act刷新列表() {
+    b加载中.value = true
     try {
-        const request = ListStudentsRequest.create({})
-        const response = await client.listStudents(request, {})
-        students.value = response.data.students
-        log(`Loaded ${response.data.students.length} students`)
+        const res = await sdk学生管理.act学生列表({ v页码: 0, v每页数量: 0 })
+        a学生列表.value = res.s学生列表
+        act记录日志(`加载 ${res.s学生列表.length} 条学生记录`)
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`List FAIL: ${caught}`)
+        act记录日志(`列表加载失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
-async function doGet(id: string) {
-    loading.value = true
+async function act查看学生(v编号: string) {
+    b加载中.value = true
     try {
-        const request = GetStudentRequest.create({ id })
-        const response = await client.getStudent(request, {})
-        const s = response.data.student
-        log(`Get: id=${s?.id}, name=${s?.name}, age=${s?.age}, class=${s?.className}`)
+        const res = await sdk学生管理.act获取学生({ v编号 })
+        const s = res.s学生
+        act记录日志(`查询: 编号=${s?.s编号}, 名字=${s?.s名字}, 年龄=${s?.s年龄}, 班级=${s?.s班级}`)
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Get FAIL: ${caught}`)
+        act记录日志(`查询失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 
 onMounted(() => {
-    doList()
+    act刷新列表()
 })
 
-async function doDelete(id: string) {
-    loading.value = true
+async function act删除学生(v编号: string) {
+    b加载中.value = true
     try {
-        const request = DeleteStudentRequest.create({ id })
-        await client.deleteStudent(request, {})
-        showSuccess(`Deleted: id=${id}`)
-        log(`Deleted: id=${id}`)
-        await doList()
+        await sdk学生管理.act删除学生({ v编号 })
+        showSuccess(`删除成功: 编号=${v编号}`)
+        act记录日志(`删除成功: 编号=${v编号}`)
+        await act刷新列表()
     } catch (caught: unknown) {
         showErrorDialog(caught)
-        log(`Delete FAIL: ${caught}`)
+        act记录日志(`删除失败: ${caught}`)
     }
-    loading.value = false
+    b加载中.value = false
 }
 </script>
 
 <template>
     <div class="demo-section">
         <div class="section-title">
-            <h2>StudentService</h2>
+            <h2>学生服务</h2>
             <span class="port">(demo1kratos :8001)</span>
         </div>
 
-        <!-- Student List -->
+        <!-- 学生列表 -->
         <div class="list-card">
             <div class="list-header">
-                <h3>Students</h3>
+                <h3>学生列表</h3>
                 <div class="header-actions">
-                    <el-button type="primary" @click="openCreate" :loading="loading" size="small">Create</el-button>
-                    <el-button @click="doList" :loading="loading" size="small">Refresh</el-button>
+                    <el-button type="primary" @click="act打开创建弹窗" :loading="b加载中" size="small">创建</el-button>
+                    <el-button @click="act刷新列表" :loading="b加载中" size="small">刷新</el-button>
                 </div>
             </div>
-            <el-table :data="students" v-loading="loading" stripe border v-if="students.length > 0">
-                <el-table-column prop="id" label="ID" width="80" align="center" />
-                <el-table-column prop="name" label="Name" align="center" />
-                <el-table-column prop="age" label="Age" width="80" align="center" />
-                <el-table-column prop="className" label="Class" align="center" />
-                <el-table-column label="Actions" width="260" align="center">
+            <el-table :data="a学生列表" v-loading="b加载中" stripe border v-if="a学生列表.length > 0">
+                <el-table-column prop="s编号" label="编号" width="80" align="center" />
+                <el-table-column prop="s名字" label="名字" align="center" />
+                <el-table-column prop="s年龄" label="年龄" width="80" align="center" />
+                <el-table-column prop="s班级" label="班级" align="center" />
+                <el-table-column label="操作" width="260" align="center">
                     <template #default="{ row }">
-                        <el-button size="small" @click="doGet(row.id)" :disabled="loading">Select</el-button>
-                        <el-button size="small" @click="openUpdate(row)" :disabled="loading">Update</el-button>
-                        <el-button size="small" type="danger" @click="doDelete(row.id)" :disabled="loading"
-                            >Delete</el-button
+                        <el-button size="small" @click="act查看学生(row.s编号)" :disabled="b加载中">查看</el-button>
+                        <el-button size="small" @click="act打开更新弹窗(row)" :disabled="b加载中">编辑</el-button>
+                        <el-button size="small" type="danger" @click="act删除学生(row.s编号)" :disabled="b加载中"
+                            >删除</el-button
                         >
                     </template>
                 </el-table-column>
             </el-table>
-            <div v-else class="empty-hint">No students yet. Click Create to add one.</div>
+            <div v-else class="empty-hint">暂无学生记录，点击创建添加</div>
         </div>
 
-        <!-- Create Dialog -->
-        <el-dialog v-model="showCreateDialog" title="Create Student" width="420" :close-on-click-modal="false">
-            <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="80px">
-                <el-form-item label="Name" prop="name">
-                    <el-input v-model="createForm.name" placeholder="Name" />
+        <!-- 创建弹窗 -->
+        <el-dialog v-model="b显示创建弹窗" title="创建学生" width="420" :close-on-click-modal="false">
+            <el-form ref="ref创建表单" :model="v创建表单" :rules="v创建规则" label-width="80px">
+                <el-form-item label="名字" prop="v名字">
+                    <el-input v-model="v创建表单.v名字" placeholder="请输入名字" />
                 </el-form-item>
-                <el-form-item label="Age" prop="age">
-                    <el-input-number v-model="createForm.age" :min="1" :max="200" />
+                <el-form-item label="年龄" prop="v年龄">
+                    <el-input-number v-model="v创建表单.v年龄" :min="1" :max="200" />
                 </el-form-item>
-                <el-form-item label="Class" prop="className">
-                    <el-input v-model="createForm.className" placeholder="Class Name" />
+                <el-form-item label="班级" prop="v班级">
+                    <el-input v-model="v创建表单.v班级" placeholder="请输入班级" />
                 </el-form-item>
             </el-form>
             <template #footer>
-                <el-button @click="showCreateDialog = false">Cancel</el-button>
-                <el-button type="primary" @click="doCreate" :loading="loading">Submit</el-button>
+                <el-button @click="b显示创建弹窗 = false">取消</el-button>
+                <el-button type="primary" @click="act创建学生" :loading="b加载中">提交</el-button>
             </template>
         </el-dialog>
 
-        <!-- Update Dialog -->
+        <!-- 更新弹窗 -->
         <el-dialog
-            v-model="showUpdateDialog"
-            :title="`Update Student (ID: ${updateForm.id})`"
+            v-model="b显示更新弹窗"
+            :title="`更新学生 (编号: ${v更新表单.v编号})`"
             width="420"
             :close-on-click-modal="false"
         >
-            <el-form ref="updateFormRef" :model="updateForm" :rules="updateRules" label-width="80px">
-                <el-form-item label="Name" prop="name">
-                    <el-input v-model="updateForm.name" placeholder="Name" />
+            <el-form ref="ref更新表单" :model="v更新表单" :rules="v更新规则" label-width="80px">
+                <el-form-item label="名字" prop="v名字">
+                    <el-input v-model="v更新表单.v名字" placeholder="请输入名字" />
                 </el-form-item>
-                <el-form-item label="Age" prop="age">
-                    <el-input-number v-model="updateForm.age" :min="1" :max="200" />
+                <el-form-item label="年龄" prop="v年龄">
+                    <el-input-number v-model="v更新表单.v年龄" :min="1" :max="200" />
                 </el-form-item>
-                <el-form-item label="Class" prop="className">
-                    <el-input v-model="updateForm.className" placeholder="Class Name" />
+                <el-form-item label="班级" prop="v班级">
+                    <el-input v-model="v更新表单.v班级" placeholder="请输入班级" />
                 </el-form-item>
             </el-form>
             <template #footer>
-                <el-button @click="showUpdateDialog = false">Cancel</el-button>
-                <el-button type="primary" @click="doUpdate" :loading="loading">Submit</el-button>
+                <el-button @click="b显示更新弹窗 = false">取消</el-button>
+                <el-button type="primary" @click="act更新学生" :loading="b加载中">提交</el-button>
             </template>
         </el-dialog>
 
-        <!-- Logs -->
+        <!-- 日志 -->
         <details class="log-section">
-            <summary>Logs ({{ logs.length }})</summary>
-            <div class="log-output" ref="logBox">
-                <div v-for="(line, i) in logs" :key="i" class="log-line">{{ line }}</div>
+            <summary>日志 ({{ a日志.length }})</summary>
+            <div class="log-output" ref="ref日志框">
+                <div v-for="(line, i) in a日志" :key="i" class="log-line">{{ line }}</div>
             </div>
         </details>
     </div>

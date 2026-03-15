@@ -17,29 +17,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type Student struct {
-	ID        int64
-	Name      string
-	Age       int32
-	ClassName string
+type Req学生信息 struct {
+	ID int64
+	V名字 string
+	V年龄 int32
+	V班级 string
 }
 
-type StudentUsecase struct {
+type Uc学生管理 struct {
 	data *data.Data
-	repo *gormrepo.Repo[models.T学生, *models.T学生Columns]
+	repo学生 *gormrepo.Repo[models.T学生, *models.T学生Columns]
 	log  *log.Helper
 }
 
-func NewStudentUsecase(data *data.Data, logger log.Logger) *StudentUsecase {
-	return &StudentUsecase{
+func NewUc学生管理(data *data.Data, logger log.Logger) *Uc学生管理 {
+	return &Uc学生管理{
 		data: data,
-		repo: gormrepo.NewRepo(gormclass.Use(&models.T学生{})),
+		repo学生: gormrepo.NewRepo(gormclass.Use(&models.T学生{})),
 		log:  log.NewHelper(logger),
 	}
 }
 
-func (uc *StudentUsecase) CreateStudent(ctx context.Context, s *Student) (*Student, *ebzkratos.Ebz) {
-	must.Nice(s.Name)
+func (uc *Uc学生管理) Xqt创建学生(ctx context.Context, req *Req学生信息) (*Req学生信息, *ebzkratos.Ebz) {
+	must.Nice(req.V名字)
 
 	db := uc.data.DB()
 
@@ -47,11 +47,11 @@ func (uc *StudentUsecase) CreateStudent(ctx context.Context, s *Student) (*Stude
 
 	if erk, err := gormkratos.Transaction(ctx, db, func(db *gorm.DB) *errors.Error {
 		v学生 = &models.T学生{
-			V名字: s.Name,
-			V年龄: s.Age,
-			V班级: s.ClassName,
+			V名字: req.V名字,
+			V年龄: req.V年龄,
+			V班级: req.V班级,
 		}
-		if err := uc.repo.With(ctx, db).Create(v学生); err != nil {
+		if err := uc.repo学生.With(ctx, db).Create(v学生); err != nil {
 			return errors.New(500, "DB_ERROR", err.Error())
 		}
 		return nil
@@ -61,37 +61,37 @@ func (uc *StudentUsecase) CreateStudent(ctx context.Context, s *Student) (*Stude
 		}
 		return nil, ebzkratos.New(pb.ErrorServerError("tx: %v", err))
 	}
-	return &Student{
-		ID:        int64(v学生.ID),
-		Name:      v学生.V名字,
-		Age:       v学生.V年龄,
-		ClassName: v学生.V班级,
+	return &Req学生信息{
+		ID: int64(v学生.ID),
+		V名字: v学生.V名字,
+		V年龄: v学生.V年龄,
+		V班级: v学生.V班级,
 	}, nil
 }
 
-func (uc *StudentUsecase) UpdateStudent(ctx context.Context, s *Student) (*Student, *ebzkratos.Ebz) {
-	must.True(s.ID > 0)
-	must.Nice(s.Name)
+func (uc *Uc学生管理) Xqt更新学生(ctx context.Context, req *Req学生信息) (*Req学生信息, *ebzkratos.Ebz) {
+	must.True(req.ID > 0)
+	must.Nice(req.V名字)
 
 	db := uc.data.DB()
 
-	if err := uc.repo.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
-		return db.Where(cls.ID.Eq(uint(s.ID)))
+	if err := uc.repo学生.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
+		return db.Where(cls.ID.Eq(uint(req.ID)))
 	}, func(cls *models.T学生Columns) gormcnm.ColumnValueMap {
-		return cls.Kw(cls.V名字.Kv(s.Name)).Kw(cls.V年龄.Kv(s.Age)).Kw(cls.V班级.Kv(s.ClassName))
+		return cls.Kw(cls.V名字.Kv(req.V名字)).Kw(cls.V年龄.Kv(req.V年龄)).Kw(cls.V班级.Kv(req.V班级))
 	}); err != nil {
 		return nil, ebzkratos.New(pb.ErrorServerError("update: %v", err))
 	}
 
-	return s, nil
+	return req, nil
 }
 
-func (uc *StudentUsecase) DeleteStudent(ctx context.Context, id int64) *ebzkratos.Ebz {
+func (uc *Uc学生管理) Xqt删除学生(ctx context.Context, id int64) *ebzkratos.Ebz {
 	must.True(id > 0)
 
 	db := uc.data.DB()
 
-	if err := uc.repo.With(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
+	if err := uc.repo学生.With(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
 		return db.Where(cls.ID.Eq(uint(id)))
 	}); err != nil {
 		return ebzkratos.New(pb.ErrorServerError("delete: %v", err))
@@ -99,12 +99,12 @@ func (uc *StudentUsecase) DeleteStudent(ctx context.Context, id int64) *ebzkrato
 	return nil
 }
 
-func (uc *StudentUsecase) GetStudent(ctx context.Context, id int64) (*Student, *ebzkratos.Ebz) {
+func (uc *Uc学生管理) Get获取学生(ctx context.Context, id int64) (*Req学生信息, *ebzkratos.Ebz) {
 	must.True(id > 0)
 
 	db := uc.data.DB()
 
-	v学生, erb := uc.repo.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
+	v学生, erb := uc.repo学生.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
 		return db.Where(cls.ID.Eq(uint(id)))
 	})
 	if erb != nil {
@@ -114,32 +114,32 @@ func (uc *StudentUsecase) GetStudent(ctx context.Context, id int64) (*Student, *
 		return nil, ebzkratos.New(pb.ErrorServerError("db: %v", erb.Cause))
 	}
 
-	return &Student{
-		ID:        int64(v学生.ID),
-		Name:      v学生.V名字,
-		Age:       v学生.V年龄,
-		ClassName: v学生.V班级,
+	return &Req学生信息{
+		ID: int64(v学生.ID),
+		V名字: v学生.V名字,
+		V年龄: v学生.V年龄,
+		V班级: v学生.V班级,
 	}, nil
 }
 
-func (uc *StudentUsecase) ListStudents(ctx context.Context, page int32, pageSize int32) ([]*Student, int32, *ebzkratos.Ebz) {
+func (uc *Uc学生管理) Get学生列表(ctx context.Context, page int32, pageSize int32) ([]*Req学生信息, int32, *ebzkratos.Ebz) {
 	db := uc.data.DB()
 
-	v学生们, err := uc.repo.With(ctx, db).Find(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
+	v学生们, err := uc.repo学生.With(ctx, db).Find(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
 		return db.Order(cls.ID.Ob("DESC").Ox())
 	})
 	if err != nil {
 		return nil, 0, ebzkratos.New(pb.ErrorServerError("list: %v", err))
 	}
 
-	items := make([]*Student, 0, len(v学生们))
+	a学生列表 := make([]*Req学生信息, 0, len(v学生们))
 	for _, v := range v学生们 {
-		items = append(items, &Student{
-			ID:        int64(v.ID),
-			Name:      v.V名字,
-			Age:       v.V年龄,
-			ClassName: v.V班级,
+		a学生列表 = append(a学生列表, &Req学生信息{
+			ID: int64(v.ID),
+			V名字: v.V名字,
+			V年龄: v.V年龄,
+			V班级: v.V班级,
 		})
 	}
-	return items, int32(len(items)), nil
+	return a学生列表, int32(len(a学生列表)), nil
 }

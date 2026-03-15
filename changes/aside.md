@@ -79,6 +79,11 @@ cd vue3project && tree --noreport
 |   |           `-- protobuf
 |   |               |-- any.ts
 |   |               `-- descriptor.ts
+|   |-- sdk
+|   |   |-- client.ts
+|   |   |-- index.ts
+|   |   |-- sdk文章管理.ts
+|   |   `-- sdk学生管理.ts
 |   |-- style.css
 |   `-- utils
 |       |-- error.ts
