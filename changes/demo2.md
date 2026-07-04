@@ -98,7 +98,7 @@ Code differences compared to source project.
 ## internal/biz/article.go (+174 -123)
 
 ```diff
-@@ -2,149 +2,177 @@
+@@ -2,187 +2,238 @@
  
  import (
  	"context"
@@ -371,18 +371,14 @@ Code differences compared to source project.
  
 -func (uc *ArticleUsecase) ListArticles(ctx context.Context, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
 +func (uc *Uc文章管理) Get文章列表(ctx context.Context, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
- 	if page < 1 {
- 		page = 1
- 	}
-@@ -152,28 +180,31 @@
- 		pageSize = 10
- 	}
+ 	must.True(page >= 1)
+ 	must.True(pageSize >= 1)
  
 -	db := uc.data.DB().WithContext(ctx)
 +	db := uc.data.DB()
  
--	var total int64
--	if err := db.Model(&Article{}).Count(&total).Error; err != nil {
+-	var count int64
+-	if err := db.Model(&Article{}).Count(&count).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count articles: %v", err))
 -	}
 -
@@ -404,7 +400,7 @@ Code differences compared to source project.
 +	if err != nil {
  		return nil, 0, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
  	}
--	return items, int32(total), nil
+-	return items, int32(count), nil
 +
 +	return conv文章列表(v文章们), int32(total), nil
  }
@@ -420,18 +416,14 @@ Code differences compared to source project.
 +// Get学生文章列表 分页返回某个学生的文章（对应 proto 的 ListStudentArticles）。
 +func (uc *Uc文章管理) Get学生文章列表(ctx context.Context, v学生编号 int64, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
 +	must.True(v学生编号 > 0)
- 	if page < 1 {
- 		page = 1
- 	}
-@@ -181,16 +212,36 @@
- 		pageSize = 10
- 	}
+ 	must.True(page >= 1)
+ 	must.True(pageSize >= 1)
  
 -	db := uc.data.DB().WithContext(ctx)
 +	db := uc.data.DB()
  
--	var total int64
--	if err := db.Model(&Article{}).Where("student_id = ?", studentID).Count(&total).Error; err != nil {
+-	var count int64
+-	if err := db.Model(&Article{}).Where("student_id = ?", studentID).Count(&count).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count student articles: %v", err))
 +	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 +		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
@@ -465,7 +457,7 @@ Code differences compared to source project.
 +			V学生编号: v.V学生编号,
 +		})
  	}
--	return items, int32(total), nil
+-	return items, int32(count), nil
 +	return a文章列表
  }
 ```
@@ -756,7 +748,7 @@ Code differences compared to source project.
  		return nil, ebz.Erk
  	}
  	return &pb.DeleteArticleReply{Success: true}, nil
-@@ -71,21 +65,21 @@
+@@ -71,11 +65,11 @@
  	if req.Id <= 0 {
  		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
@@ -770,6 +762,10 @@ Code differences compared to source project.
  }
  
  func (s *ArticleService) ListArticles(ctx context.Context, req *pb.ListArticlesRequest) (*pb.ListArticlesReply, error) {
+@@ -85,13 +79,13 @@
+ 	if req.PageSize < 1 {
+ 		return nil, pb.ErrorBadParam("PAGE_SIZE MUST BE POSITIVE")
+ 	}
 -	articles, count, ebz := s.uc.ListArticles(ctx, req.Page, req.PageSize)
 +	a文章列表, count, ebz := s.uc.Get文章列表(ctx, req.Page, req.PageSize)
  	if ebz != nil {
@@ -784,9 +780,9 @@ Code differences compared to source project.
  	}
  	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
  }
-@@ -94,13 +88,13 @@
- 	if req.StudentId <= 0 {
- 		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+@@ -106,13 +100,13 @@
+ 	if req.PageSize < 1 {
+ 		return nil, pb.ErrorBadParam("PAGE_SIZE MUST BE POSITIVE")
  	}
 -	articles, count, ebz := s.uc.ListStudentArticles(ctx, req.StudentId, req.Page, req.PageSize)
 +	a文章列表, count, ebz := s.uc.Get学生文章列表(ctx, req.StudentId, req.Page, req.PageSize)

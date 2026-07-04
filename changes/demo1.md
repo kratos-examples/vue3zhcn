@@ -108,7 +108,7 @@ Code differences compared to source project.
 ## internal/biz/student.go (+141 -89)
 
 ```diff
-@@ -2,135 +2,170 @@
+@@ -2,148 +2,200 @@
  
  import (
  	"context"
@@ -357,18 +357,14 @@ Code differences compared to source project.
  
 -func (uc *StudentUsecase) ListStudents(ctx context.Context, page int32, pageSize int32) ([]*Student, int32, *ebzkratos.Ebz) {
 +func (uc *Uc学生管理) Get学生列表(ctx context.Context, page int32, pageSize int32) ([]*Req学生信息, int32, *ebzkratos.Ebz) {
- 	if page < 1 {
- 		page = 1
- 	}
-@@ -138,16 +173,33 @@
- 		pageSize = 10
- 	}
+ 	must.True(page >= 1)
+ 	must.True(pageSize >= 1)
  
 -	db := uc.data.DB().WithContext(ctx)
 +	db := uc.data.DB()
  
--	var total int64
--	if err := db.Model(&Student{}).Count(&total).Error; err != nil {
+-	var count int64
+-	if err := db.Model(&Student{}).Count(&count).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count students: %v", err))
 +	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
 +	v学生们, total, err := uc.repo学生.With(ctx, db).FindPageAndCount(
@@ -399,7 +395,7 @@ Code differences compared to source project.
 +			V班级: v.V班级,
 +		})
  	}
--	return items, int32(total), nil
+-	return items, int32(count), nil
 +	return a学生列表, int32(total), nil
  }
 ```
@@ -673,7 +669,7 @@ Code differences compared to source project.
  		return nil, ebz.Erk
  	}
  	return &pb.DeleteStudentReply{Success: true}, nil
-@@ -65,21 +65,21 @@
+@@ -65,11 +65,11 @@
  	if req.Id <= 0 {
  		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
@@ -687,6 +683,10 @@ Code differences compared to source project.
  }
  
  func (s *StudentService) ListStudents(ctx context.Context, req *pb.ListStudentsRequest) (*pb.ListStudentsReply, error) {
+@@ -79,13 +79,13 @@
+ 	if req.PageSize < 1 {
+ 		return nil, pb.ErrorBadParam("PAGE_SIZE MUST BE POSITIVE")
+ 	}
 -	students, count, ebz := s.uc.ListStudents(ctx, req.Page, req.PageSize)
 +	a学生列表, count, ebz := s.uc.Get学生列表(ctx, req.Page, req.PageSize)
  	if ebz != nil {
