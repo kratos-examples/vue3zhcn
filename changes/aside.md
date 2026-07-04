@@ -86,7 +86,7 @@ cd vue3project && tree --noreport
 |   |   `-- sdk学生管理.ts
 |   |-- style.css
 |   `-- utils
-|       |-- error.ts
+|       |-- cause.ts
 |       `-- message.ts
 |-- tsconfig.app.json
 |-- tsconfig.json

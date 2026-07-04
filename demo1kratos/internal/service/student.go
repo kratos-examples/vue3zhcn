@@ -40,7 +40,7 @@ func (s *StudentService) UpdateStudent(ctx context.Context, req *pb.UpdateStuden
 		return nil, pb.ErrorBadParam("NAME IS REQUIRED")
 	}
 	v, ebz := s.uc.Xqt更新学生(ctx, &biz.Req学生信息{
-		ID: req.Id,
+		ID:  req.Id,
 		V名字: req.Name,
 		V年龄: req.Age,
 		V班级: req.ClassName,

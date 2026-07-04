@@ -3,8 +3,9 @@ import { ref, reactive, nextTick, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { sdk文章管理 } from '../sdk'
 import type { T文章信息 } from '../sdk'
-import { showErrorDialog } from '../utils/error'
-import { showSuccess } from '../utils/message'
+import { ErrorReason } from '../rpc/demo2/article/reason_enum'
+import { parseCause, showCauseDialog } from '../utils/cause'
+import { showSuccess, showWarning } from '../utils/message'
 
 const a文章列表 = ref<T文章信息[]>([])
 const a日志 = ref<string[]>([])
@@ -59,7 +60,13 @@ async function act创建文章() {
         await act刷新列表()
         b显示创建弹窗.value = false
     } catch (caught: unknown) {
-        showErrorDialog(caught)
+        // 标准枚举反查：枚举值类型化，proto 改名这里编译就报错——不硬编码 reason 字符串。
+        const cause = parseCause(caught)
+        if (cause.reason === ErrorReason[ErrorReason.BAD_PARAM]) {
+            showWarning('文章信息不合法（学生可能不存在）')
+        } else {
+            showCauseDialog(caught)
+        }
         act记录日志(`创建失败: ${caught}`)
     }
     b加载中.value = false
@@ -91,7 +98,13 @@ async function act更新文章() {
         await act刷新列表()
         b显示更新弹窗.value = false
     } catch (caught: unknown) {
-        showErrorDialog(caught)
+        // 标准枚举反查：枚举值类型化，proto 改名这里编译就报错——不硬编码 reason 字符串。
+        const cause = parseCause(caught)
+        if (cause.reason === ErrorReason[ErrorReason.ARTICLE_NOT_FOUND]) {
+            showWarning(`文章 ${v更新表单.v编号} 不存在`)
+        } else {
+            showCauseDialog(caught)
+        }
         act记录日志(`更新失败: ${caught}`)
     }
     b加载中.value = false
@@ -104,7 +117,7 @@ async function act刷新列表() {
         a文章列表.value = res.s文章列表
         act记录日志(`加载 ${res.s文章列表.length} 条文章记录`)
     } catch (caught: unknown) {
-        showErrorDialog(caught)
+        showCauseDialog(caught)
         act记录日志(`列表加载失败: ${caught}`)
     }
     b加载中.value = false
@@ -117,7 +130,13 @@ async function act查看文章(v编号: string) {
         const a = res.s文章
         act记录日志(`查询: 编号=${a?.s编号}, 标题=${a?.s标题}, 内容=${a?.s内容}, 学生编号=${a?.s学生编号}`)
     } catch (caught: unknown) {
-        showErrorDialog(caught)
+        // 标准枚举反查：枚举值类型化，proto 改名这里编译就报错——不硬编码 reason 字符串。
+        const cause = parseCause(caught)
+        if (cause.reason === ErrorReason[ErrorReason.ARTICLE_NOT_FOUND]) {
+            showWarning(`文章 ${v编号} 不存在`)
+        } else {
+            showCauseDialog(caught)
+        }
         act记录日志(`查询失败: ${caught}`)
     }
     b加载中.value = false
@@ -135,7 +154,13 @@ async function act删除文章(v编号: string) {
         act记录日志(`删除成功: 编号=${v编号}`)
         await act刷新列表()
     } catch (caught: unknown) {
-        showErrorDialog(caught)
+        // 标准枚举反查：枚举值类型化，proto 改名这里编译就报错——不硬编码 reason 字符串。
+        const cause = parseCause(caught)
+        if (cause.reason === ErrorReason[ErrorReason.ARTICLE_NOT_FOUND]) {
+            showWarning(`文章 ${v编号} 不存在`)
+        } else {
+            showCauseDialog(caught)
+        }
         act记录日志(`删除失败: ${caught}`)
     }
     b加载中.value = false

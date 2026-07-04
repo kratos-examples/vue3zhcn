@@ -2,57 +2,21 @@ GOHOSTOS:=$(shell go env GOHOSTOS)
 GOPATH:=$(shell go env GOPATH)
 VERSION=$(shell git describe --tags --always)
 
-ifeq ($(GOHOSTOS), windows)
-	#the `find.exe` is different from `find` in bash/shell.
-	#to see https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/find.
-	#changed to use git-bash.exe to run find cli or other cli friendly, caused of every developer has a Git.
-	#Git_Bash= $(subst cmd\,bin\bash.exe,$(dir $(shell where git)))
-	Git_Bash=$(subst \,/,$(subst cmd\,bin\bash.exe,$(dir $(shell where git))))
-	INTERNAL_PROTO_FILES=$(shell $(Git_Bash) -c "find internal -name *.proto")
-	API_PROTO_FILES=$(shell $(Git_Bash) -c "find api -name *.proto")
-else
-	INTERNAL_PROTO_FILES=$(shell find internal -name *.proto)
-	API_PROTO_FILES=$(shell find api -name *.proto)
-endif
-
 .PHONY: init
 # init env
 init:
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	go install github.com/go-kratos/kratos/cmd/kratos/v2@latest
-	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-errors/v2@latest
-	go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
 	go install github.com/google/wire/cmd/wire@latest
+	go install github.com/bufbuild/buf/cmd/buf@latest
 
 .PHONY: config
 # generate internal proto
 config:
-	protoc --proto_path=./internal \
-	       --proto_path=./third_party \
- 	       --go_out=paths=source_relative:./internal \
-	       $(INTERNAL_PROTO_FILES)
+	buf generate --template buf.gen.config.yaml
 
 .PHONY: api
 # generate api proto
 api:
-	protoc --proto_path=./api \
-	       --proto_path=./third_party \
- 	       --go_out=paths=source_relative:./api \
- 	       --go-http_out=paths=source_relative:./api \
- 	       --go-grpc_out=paths=source_relative:./api \
-	       --openapi_out=fq_schema_naming=true,default_response=false:. \
-	       $(API_PROTO_FILES)
-
-.PHONY: errors
-# generate errors code
-errors:
-	protoc --proto_path=./api \
-		   --proto_path=./third_party \
-		   --go_out=paths=source_relative:./api \
-		   --go-errors_out=paths=source_relative:./api \
-		   $(API_PROTO_FILES)
+	buf generate --template buf.gen.yaml
 
 .PHONY: build
 # build
@@ -64,16 +28,27 @@ build:
 generate:
 	go generate ./...
 	go mod tidy
-	@# Remove obsolete +build tags from wire_gen.go
-	@sed -i '' '/^\/\/ +build/d' ./cmd/*/wire_gen.go
 
 .PHONY: all
 # generate all
 all:
-	make api;
-	make errors;
-	make config;
-	make generate;
+	make api
+	make config
+	make generate
+
+# generate TypeScript gRPC clients from proto files (via buf)
+# go install github.com/yylego/kratos-vue3/cmd/vue3kratos@latest
+web_api_grpc_ts:
+	mkdir -p ./bin/web_api_grpc_ts.out
+	buf generate --template buf.gen.ts.yaml --include-imports
+
+# convert gRPC clients to HTTP clients
+web_api_grpc_to_http:
+	vue3kratos gen-grpc-via-http-in-root --grpc-ts-root=./bin/web_api_grpc_ts.out
+
+# cleanup generated TypeScript files
+web_api_cleanup:
+	rm -rf ./bin/web_api_grpc_ts.out
 
 # show help
 help:

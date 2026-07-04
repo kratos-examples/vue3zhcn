@@ -3,30 +3,30 @@ import { isAxiosError } from 'axios'
 import { ElMessageBox } from 'element-plus'
 import { h } from 'vue'
 
-// Kratos error response structure
-interface KratosErrorData {
+// KratosFault is the raw Kratos error response wire format
+interface KratosFault {
     reason: string
     code: number
     message: string
     metadata: Record<string, string | undefined>
 }
 
-// Parsed error info
-export interface ErrorInfo {
+// Parsed cause info
+export interface CauseInfo {
     httpCode: number
     reason: string
     message: string
 }
 
-// Parse Kratos error from AxiosError
-export function parseError(caught: unknown): ErrorInfo {
+// Parse the caught value into CauseInfo
+export function parseCause(caught: unknown): CauseInfo {
     if (isAxiosError(caught)) {
         const axiosErr = caught as AxiosError
         if (axiosErr.code === 'ERR_NETWORK') {
             return { httpCode: 0, reason: 'ERR_NETWORK', message: 'Network error, check connection' }
         }
         if (axiosErr.response?.data) {
-            const data = axiosErr.response.data as KratosErrorData
+            const data = axiosErr.response.data as KratosFault
             return {
                 httpCode: data.code ?? axiosErr.response.status ?? 500,
                 reason: data.reason ?? 'UNKNOWN',
@@ -37,9 +37,9 @@ export function parseError(caught: unknown): ErrorInfo {
     return { httpCode: 500, reason: 'UNKNOWN', message: String(caught) }
 }
 
-// Show error in a dialog
-export function showErrorDialog(caught: unknown) {
-    const info = parseError(caught)
+// Show the cause in a dialog
+export function showCauseDialog(caught: unknown) {
+    const info = parseCause(caught)
     ElMessageBox({
         title: info.httpCode === 0 ? 'Network Error' : `Error (${info.httpCode})`,
         message: h('div', { style: 'font-size:14px' }, [

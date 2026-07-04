@@ -40,7 +40,7 @@ func (s *ArticleService) UpdateArticle(ctx context.Context, req *pb.UpdateArticl
 		return nil, pb.ErrorBadParam("TITLE IS REQUIRED")
 	}
 	v, ebz := s.uc.Xqt更新文章(ctx, &biz.Req文章信息{
-		ID:   req.Id,
+		ID:    req.Id,
 		V标题:   req.Title,
 		V内容:   req.Content,
 		V学生编号: req.StudentId,
