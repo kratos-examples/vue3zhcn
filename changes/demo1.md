@@ -105,10 +105,10 @@ Code differences compared to source project.
 +var ProviderSet = wire.NewSet(NewUc学生管理)
 ```
 
-## internal/biz/student.go (+131 -96)
+## internal/biz/student.go (+141 -89)
 
 ```diff
-@@ -2,152 +2,187 @@
+@@ -2,135 +2,170 @@
  
  import (
  	"context"
@@ -356,23 +356,33 @@ Code differences compared to source project.
  }
  
 -func (uc *StudentUsecase) ListStudents(ctx context.Context, page int32, pageSize int32) ([]*Student, int32, *ebzkratos.Ebz) {
--	if page < 1 {
--		page = 1
--	}
--	if pageSize < 1 {
--		pageSize = 10
--	}
 +func (uc *Uc学生管理) Get学生列表(ctx context.Context, page int32, pageSize int32) ([]*Req学生信息, int32, *ebzkratos.Ebz) {
-+	db := uc.data.DB()
+ 	if page < 1 {
+ 		page = 1
+ 	}
+@@ -138,16 +173,33 @@
+ 		pageSize = 10
+ 	}
  
 -	db := uc.data.DB().WithContext(ctx)
--
++	db := uc.data.DB()
+ 
 -	var total int64
 -	if err := db.Model(&Student{}).Count(&total).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count students: %v", err))
-+	v学生们, err := uc.repo学生.With(ctx, db).Find(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
-+		return db.Order(cls.ID.Ob("DESC").Ox())
-+	})
++	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
++	v学生们, total, err := uc.repo学生.With(ctx, db).FindPageAndCount(
++		func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
++			return db
++		},
++		func(cls *models.T学生Columns) gormcnm.OrderByBottle {
++			return cls.ID.Ob("asc")
++		},
++		&gormrepo.Pagination{
++			Offset: int((page - 1) * pageSize),
++			Limit:  int(pageSize),
++		},
++	)
 +	if err != nil {
 +		return nil, 0, ebzkratos.New(pb.ErrorDbError("list students: %v", err))
  	}
@@ -390,7 +400,7 @@ Code differences compared to source project.
 +		})
  	}
 -	return items, int32(total), nil
-+	return a学生列表, int32(len(a学生列表)), nil
++	return a学生列表, int32(total), nil
  }
 ```
 
@@ -642,7 +652,7 @@ Code differences compared to source project.
 -		Age:       req.Age,
 -		ClassName: req.ClassName,
 +	v, ebz := s.uc.Xqt更新学生(ctx, &biz.Req学生信息{
-+		ID: req.Id,
++		ID:  req.Id,
 +		V名字: req.Name,
 +		V年龄: req.Age,
 +		V班级: req.ClassName,

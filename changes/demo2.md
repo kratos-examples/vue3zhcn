@@ -95,10 +95,10 @@ Code differences compared to source project.
  	app := newApp(logger, grpcServer, httpServer)
 ```
 
-## internal/biz/article.go (+126 -143)
+## internal/biz/article.go (+174 -123)
 
 ```diff
-@@ -2,195 +2,178 @@
+@@ -2,149 +2,177 @@
  
  import (
  	"context"
@@ -237,6 +237,7 @@ Code differences compared to source project.
 +func (uc *Uc文章管理) Xqt更新文章(ctx context.Context, req *Req文章信息) (*Req文章信息, *ebzkratos.Ebz) {
 +	must.True(req.ID > 0)
 +	must.Nice(req.V标题)
++	must.True(req.V学生编号 > 0)
  
 -	// Same transaction + FOR SHARE lock as CreateArticle: the (new) owning
 -	// student cannot be deleted while we re-point the article.
@@ -249,16 +250,18 @@ Code differences compared to source project.
 -			if errors.Is(err, gorm.ErrRecordNotFound) {
 -				studentMissing = true
 -				return nil
--			}
--			return err
 +	db := uc.data.DB()
 +
-+	// 先确认文章存在，对齐桩子：查不到返回 ArticleNotFound 而非静默成功
-+	if _, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Where(cls.ID.Eq(uint(req.ID)))
-+	}); erb != nil {
-+		if erb.NotExist {
-+			return nil, ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", req.ID))
++	// 与创建相同的 FOR SHARE 锁住新归属学生，再确认文章本身存在，对齐桩子。
++	if erk, err := gormkratos.Transaction(ctx, db, func(db *gorm.DB) *errors.Error {
++		if _, erb := uc.repo学生.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
++			return db.Clauses(clause.Locking{Strength: clause.LockingStrengthShare}).Where(cls.ID.Eq(uint(req.V学生编号)))
++		}); erb != nil {
++			if erb.NotExist {
++				return pb.ErrorBadParam("student %d does not exist", req.V学生编号)
+ 			}
+-			return err
++			return pb.ErrorDbError("get student: %v", erb.Cause)
  		}
 -		upd := db.Model(res).Updates(map[string]any{
 -			"title":      a.Title,
@@ -267,23 +270,34 @@ Code differences compared to source project.
 -		})
 -		if upd.Error != nil {
 -			return upd.Error
--		}
++		if _, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db.Where(cls.ID.Eq(uint(req.ID)))
++		}); erb != nil {
++			if erb.NotExist {
++				return pb.ErrorArticleNotFound("article %d not found", req.ID)
++			}
++			return pb.ErrorDbError("get article: %v", erb.Cause)
+ 		}
 -		if upd.RowsAffected == 0 {
 -			articleMissing = true
 -			return nil
--		}
++		if err := uc.repo文章.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db.Where(cls.ID.Eq(uint(req.ID)))
++		}, func(cls *models.T文章Columns) gormcnm.ColumnValueMap {
++			return cls.Kw(cls.V标题.Kv(req.V标题)).Kw(cls.V内容.Kv(req.V内容)).Kw(cls.V学生编号.Kv(req.V学生编号))
++		}); err != nil {
++			return pb.ErrorDbError("update article: %v", err)
+ 		}
 -		return db.First(res, a.ID).Error
 -	})
 -	if err != nil {
-+		return nil, ebzkratos.New(pb.ErrorDbError("get article: %v", erb.Cause))
-+	}
-+
-+	if err := uc.repo文章.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Where(cls.ID.Eq(uint(req.ID)))
-+	}, func(cls *models.T文章Columns) gormcnm.ColumnValueMap {
-+		return cls.Kw(cls.V标题.Kv(req.V标题)).Kw(cls.V内容.Kv(req.V内容)).Kw(cls.V学生编号.Kv(req.V学生编号))
+-		return nil, ebzkratos.New(pb.ErrorDbError("update article: %v", err))
++		return nil
 +	}); err != nil {
- 		return nil, ebzkratos.New(pb.ErrorDbError("update article: %v", err))
++		if erk != nil {
++			return nil, ebzkratos.New(erk)
++		}
++		return nil, ebzkratos.New(pb.ErrorTxError("tx: %v", err))
  	}
 -	if studentMissing {
 -		return nil, ebzkratos.New(pb.ErrorBadParam("student %d does not exist", a.StudentID))
@@ -356,17 +370,17 @@ Code differences compared to source project.
  }
  
 -func (uc *ArticleUsecase) ListArticles(ctx context.Context, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
--	if page < 1 {
--		page = 1
--	}
--	if pageSize < 1 {
--		pageSize = 10
--	}
 +func (uc *Uc文章管理) Get文章列表(ctx context.Context, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
-+	db := uc.data.DB()
+ 	if page < 1 {
+ 		page = 1
+ 	}
+@@ -152,28 +180,31 @@
+ 		pageSize = 10
+ 	}
  
 -	db := uc.data.DB().WithContext(ctx)
--
++	db := uc.data.DB()
+ 
 -	var total int64
 -	if err := db.Model(&Article{}).Count(&total).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count articles: %v", err))
@@ -374,14 +388,26 @@ Code differences compared to source project.
 -
 -	var items []*Article
 -	if err := db.Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
-+	v文章们, err := uc.repo文章.With(ctx, db).Find(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Order(cls.ID.Ob("DESC").Ox())
-+	})
++	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
++	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
++		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db
++		},
++		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
++			return cls.ID.Ob("asc")
++		},
++		&gormrepo.Pagination{
++			Offset: int((page - 1) * pageSize),
++			Limit:  int(pageSize),
++		},
++	)
 +	if err != nil {
  		return nil, 0, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
  	}
 -	return items, int32(total), nil
--}
++
++	return conv文章列表(v文章们), int32(total), nil
+ }
  
 -// ListStudentArticles returns one student's articles, one page at a time. The
 -// student↔article relationship gets its own endpoint instead of overloading
@@ -391,8 +417,45 @@ Code differences compared to source project.
 -// 而不是往 ListArticles 上塞过滤参数。
 -func (uc *ArticleUsecase) ListStudentArticles(ctx context.Context, studentID int64, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
 -	must.True(studentID > 0)
--	if page < 1 {
--		page = 1
++// Get学生文章列表 分页返回某个学生的文章（对应 proto 的 ListStudentArticles）。
++func (uc *Uc文章管理) Get学生文章列表(ctx context.Context, v学生编号 int64, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
++	must.True(v学生编号 > 0)
+ 	if page < 1 {
+ 		page = 1
+ 	}
+@@ -181,16 +212,36 @@
+ 		pageSize = 10
+ 	}
+ 
+-	db := uc.data.DB().WithContext(ctx)
++	db := uc.data.DB()
+ 
+-	var total int64
+-	if err := db.Model(&Article{}).Where("student_id = ?", studentID).Count(&total).Error; err != nil {
+-		return nil, 0, ebzkratos.New(pb.ErrorDbError("count student articles: %v", err))
++	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
++		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db.Where(cls.V学生编号.Eq(v学生编号))
++		},
++		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
++			return cls.ID.Ob("asc")
++		},
++		&gormrepo.Pagination{
++			Offset: int((page - 1) * pageSize),
++			Limit:  int(pageSize),
++		},
++	)
++	if err != nil {
++		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
+ 	}
+ 
+-	var items []*Article
+-	if err := db.Where("student_id = ?", studentID).Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
+-		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
++	return conv文章列表(v文章们), int32(total), nil
++}
++
++func conv文章列表(v文章们 []*models.T文章) []*Req文章信息 {
 +	a文章列表 := make([]*Req文章信息, 0, len(v文章们))
 +	for _, v := range v文章们 {
 +		a文章列表 = append(a文章列表, &Req文章信息{
@@ -402,23 +465,8 @@ Code differences compared to source project.
 +			V学生编号: v.V学生编号,
 +		})
  	}
--	if pageSize < 1 {
--		pageSize = 10
--	}
--
--	db := uc.data.DB().WithContext(ctx)
--
--	var total int64
--	if err := db.Model(&Article{}).Where("student_id = ?", studentID).Count(&total).Error; err != nil {
--		return nil, 0, ebzkratos.New(pb.ErrorDbError("count student articles: %v", err))
--	}
--
--	var items []*Article
--	if err := db.Where("student_id = ?", studentID).Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
--		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
--	}
 -	return items, int32(total), nil
-+	return a文章列表, int32(len(a文章列表)), nil
++	return a文章列表
  }
 ```
 
@@ -634,7 +682,7 @@ Code differences compared to source project.
 +}
 ```
 
-## internal/service/article.go (+20 -41)
+## internal/service/article.go (+24 -30)
 
 ```diff
 @@ -10,10 +10,10 @@
@@ -687,7 +735,7 @@ Code differences compared to source project.
 -		Content:   req.Content,
 -		StudentID: req.StudentId,
 +	v, ebz := s.uc.Xqt更新文章(ctx, &biz.Req文章信息{
-+		ID:   req.Id,
++		ID:    req.Id,
 +		V标题:   req.Title,
 +		V内容:   req.Content,
 +		V学生编号: req.StudentId,
@@ -708,7 +756,7 @@ Code differences compared to source project.
  		return nil, ebz.Erk
  	}
  	return &pb.DeleteArticleReply{Success: true}, nil
-@@ -71,36 +65,21 @@
+@@ -71,21 +65,21 @@
  	if req.Id <= 0 {
  		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
@@ -730,18 +778,21 @@ Code differences compared to source project.
 -	items := make([]*pb.ArticleInfo, 0, len(articles))
 -	for _, v := range articles {
 -		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.Title, Content: v.Content, StudentId: v.StudentID})
--	}
--	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
--}
--
--func (s *ArticleService) ListStudentArticles(ctx context.Context, req *pb.ListStudentArticlesRequest) (*pb.ListArticlesReply, error) {
--	if req.StudentId <= 0 {
--		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
--	}
++	items := make([]*pb.ArticleInfo, 0, len(a文章列表))
++	for _, v := range a文章列表 {
++		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号})
+ 	}
+ 	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
+ }
+@@ -94,13 +88,13 @@
+ 	if req.StudentId <= 0 {
+ 		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+ 	}
 -	articles, count, ebz := s.uc.ListStudentArticles(ctx, req.StudentId, req.Page, req.PageSize)
--	if ebz != nil {
--		return nil, ebz.Erk
--	}
++	a文章列表, count, ebz := s.uc.Get学生文章列表(ctx, req.StudentId, req.Page, req.PageSize)
+ 	if ebz != nil {
+ 		return nil, ebz.Erk
+ 	}
 -	items := make([]*pb.ArticleInfo, 0, len(articles))
 -	for _, v := range articles {
 -		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.Title, Content: v.Content, StudentId: v.StudentID})

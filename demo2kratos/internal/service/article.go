@@ -83,3 +83,18 @@ func (s *ArticleService) ListArticles(ctx context.Context, req *pb.ListArticlesR
 	}
 	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
 }
+
+func (s *ArticleService) ListStudentArticles(ctx context.Context, req *pb.ListStudentArticlesRequest) (*pb.ListArticlesReply, error) {
+	if req.StudentId <= 0 {
+		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+	}
+	a文章列表, count, ebz := s.uc.Get学生文章列表(ctx, req.StudentId, req.Page, req.PageSize)
+	if ebz != nil {
+		return nil, ebz.Erk
+	}
+	items := make([]*pb.ArticleInfo, 0, len(a文章列表))
+	for _, v := range a文章列表 {
+		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号})
+	}
+	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
+}
