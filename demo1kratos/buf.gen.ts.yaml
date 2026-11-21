@@ -1,9 +1,13 @@
+# 使用 kratos-ts-http 的插件，产出即为最终的 HTTP 形态客户端，无需第二步改写。
+# 落点不在此处指定，由命令行的 -o 决定。
+# Uses the kratos-ts-http plugin, so the output is the finished HTTP-form client.
+# The destination is set on the command line with -o, not here.
 version: v2
 inputs:
   - directory: api
 plugins:
-  - local: protoc-gen-ts
-    out: bin/web_api_grpc_ts.out
+  - local: protoc-gen-kratos-ts-http
+    out: .
     opt:
       - ts_nocheck
       - eslint_disable

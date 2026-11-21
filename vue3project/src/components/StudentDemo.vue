@@ -113,7 +113,8 @@ async function act更新学生() {
 async function act刷新列表() {
     b加载中.value = true
     try {
-        const res = await sdk学生管理.act学生列表({ v页码: 0, v每页数量: 0 })
+        // 后端守卫 v页码>=1、v每页数量>=1；此处无分页控件，直接取第 1 页、一次拉足够多。
+        const res = await sdk学生管理.act学生列表({ v页码: 1, v每页数量: 100 })
         a学生列表.value = res.s学生列表
         act记录日志(`加载 ${res.s学生列表.length} 条学生记录`)
     } catch (caught: unknown) {

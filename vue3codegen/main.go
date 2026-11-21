@@ -1,84 +1,57 @@
 package main
 
 import (
-	"bytes"
-	"os"
 	"path/filepath"
 
 	"github.com/yylego/done"
-	"github.com/yylego/kratos-vue3/vue3kratos"
-	"github.com/yylego/must"
-	"github.com/yylego/osexec"
+	"github.com/yylego/kratos-ts-http/kratostshttp"
 	"github.com/yylego/osexistpath/osmustexist"
-	"github.com/yylego/rese"
 	"github.com/yylego/runpath"
 	"github.com/yylego/zaplog"
 	"go.uber.org/zap"
 )
 
+// 从两个后端的 proto 生成前端可直接使用的 TypeScript 客户端。
+// Generates the frontend TypeScript clients from the protos of both backends.
+//
+// 这里走的是 kratos-ts-http 的第二条路线：在 Go 里驱动 buf，落点作为参数传进去，
+// 所以跨目录的相对路径由 runpath 算出来，不必写进 Makefile。
+// This takes the second kratos-ts-http route: drive buf from Go and pass the destination in,
+// so runpath works out the cross-directory path instead of the Makefile carrying it.
+//
+// 各后端目录里的 `make web_rpc_ts` 是同一件事的第一条路线，产出一致，按手边方便挑一个。
+// The `make web_rpc_ts` target in each backend does the same thing through the first route;
+// both produce the same output, so take whichever is at hand.
 func main() {
-	zaplog.SUG.Infoln("=== Vue3 Client Code Gen Workflow Start ===")
+	zaplog.SUG.Infoln("=== Vue3 client code gen start ===")
 
-	frontendRoot := runpath.PARENT.UpTo(1, "vue3project")
+	frontendRoot := osmustexist.ROOT(runpath.PARENT.UpTo(1, "vue3project"))
 
-	// Generate for demo1kratos
-	demo1Root := runpath.PARENT.UpTo(1, "demo1kratos")
-	zaplog.LOG.Debug("demo1kratos", zap.String("backend", demo1Root), zap.String("frontend", frontendRoot))
-	runGenerate(demo1Root, filepath.Join(frontendRoot, "src/rpc/demo1"))
+	runGenerate(runpath.PARENT.UpTo(1, "demo1kratos"), filepath.Join(frontendRoot, "src", "rpc", "demo1"))
+	runGenerate(runpath.PARENT.UpTo(1, "demo2kratos"), filepath.Join(frontendRoot, "src", "rpc", "demo2"))
 
-	// Generate for demo2kratos
-	demo2Root := runpath.PARENT.UpTo(1, "demo2kratos")
-	zaplog.LOG.Debug("demo2kratos", zap.String("backend", demo2Root), zap.String("frontend", frontendRoot))
-	runGenerate(demo2Root, filepath.Join(frontendRoot, "src/rpc/demo2"))
-
-	zaplog.SUG.Infoln("=== WORKFLOW FINISHED SUCCESS! ===")
+	zaplog.SUG.Infoln("=== finished ===")
 }
 
-func runGenerate(kratosRoot string, clientCodeDest string) {
-	// Step 1: Validate backend project
-	zaplog.SUG.Infoln("Backend project:", kratosRoot)
-	osmustexist.ROOT(kratosRoot)
+// runGenerate 生成一个后端的客户端，一次调用完成生成与改写，中间不落任何产物。
+// runGenerate covers one backend: a single call does generation and rewriting, with nothing
+// staged in between.
+//
+// `--clean` 让 buf 先清空落点再生成：buf 只覆盖同名文件、从不删除不再生成的旧文件，
+// 少了它，proto 一旦不再 import 某个类型，那个 .ts 就会一直躺在前端目录里没人发现。
+// ⛔仅因为这个落点【由本次生成独占】才敢清；若某个目录要接纳多趟生成，就不能带它。
+// `--clean` wipes the destination first: buf overwrites files but never deletes ones it no
+// longer generates, so a type dropped from the proto leaves its .ts behind for good.
+// ⛔Safe here only because this destination belongs to this one run.
+func runGenerate(kratosRoot string, outPath string) {
+	kratosRoot = osmustexist.ROOT(kratosRoot)
+	zaplog.LOG.Debug("paths", zap.String("backend", kratosRoot), zap.String("out-path", outPath))
 
-	// Step 2: Check Makefile exists and contains required targets
-	makefilePath := filepath.Join(kratosRoot, "Makefile")
-	osmustexist.FILE(makefilePath)
+	done.Done(kratostshttp.BufGenerate(kratosRoot, outPath, []string{
+		"--template", "buf.gen.ts.yaml",
+		"--include-imports",
+		"--clean",
+	}))
 
-	makefileData := rese.A1(os.ReadFile(makefilePath))
-	must.True(bytes.Contains(makefileData, []byte("web_api_grpc_ts:")))
-	must.True(bytes.Contains(makefileData, []byte("web_api_grpc_to_http:")))
-	must.True(bytes.Contains(makefileData, []byte("web_api_cleanup:")))
-	zaplog.SUG.Infoln("Makefile targets verified")
-
-	// Step 3: Generate TypeScript gRPC clients from proto files
-	grpcTsOutput := filepath.Join(kratosRoot, "bin", "web_api_grpc_ts.out")
-	zaplog.SUG.Infoln("Generating TypeScript gRPC clients...")
-	zaplog.SUG.Infoln("   Output DIR:", grpcTsOutput)
-
-	if osmustexist.IsRootExist(filepath.Join(kratosRoot, "bin")) {
-		zaplog.SUG.Infoln("   Cleaning previous output...")
-		done.Done(os.RemoveAll(grpcTsOutput))
-	}
-
-	rese.A1(osexec.ExecInPath(kratosRoot, "make", "web_api_grpc_ts"))
-	osmustexist.ROOT(grpcTsOutput)
-	zaplog.SUG.Infoln("TypeScript gRPC clients generated")
-
-	// Step 4: Convert gRPC clients to HTTP clients (in bin directory)
-	zaplog.SUG.Infoln("Converting gRPC clients to HTTP clients...")
-	rese.A1(osexec.ExecInPath(kratosRoot, "make", "web_api_grpc_to_http"))
-	zaplog.SUG.Infoln("Conversion completed")
-
-	// Step 5: Sync converted files to frontend project
-	osmustexist.ROOT(clientCodeDest)
-
-	zaplog.SUG.Infoln("Syncing converted files...")
-	zaplog.SUG.Infoln("   From:", grpcTsOutput)
-	zaplog.SUG.Infoln("   To:  ", clientCodeDest)
-	vue3kratos.CloneFilesToDestRoot(grpcTsOutput, clientCodeDest)
-	zaplog.SUG.Infoln("File sync completed")
-
-	// Step 6: Cleanup temp files
-	zaplog.SUG.Infoln("Cleaning up temp files...")
-	rese.A1(osexec.ExecInPath(kratosRoot, "make", "web_api_cleanup"))
-	zaplog.SUG.Infoln("Cleanup completed")
+	zaplog.SUG.Infoln("client code sits in", outPath)
 }
