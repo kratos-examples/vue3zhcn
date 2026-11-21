@@ -10,7 +10,7 @@ import (
 	"github.com/yylego/kratos-examples/demo1kratos/internal/service"
 )
 
-func NewGRPCServer(c *conf.Server, student *service.StudentService, logger *slog.Logger) *grpc.Server {
+func NewGRPCServer(c *conf.Server, student *service.Svc学生服务, logger *slog.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),

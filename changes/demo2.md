@@ -2,42 +2,61 @@
 
 Code differences compared to source project.
 
-## Makefile (+14 -0)
+## Makefile (+22 -0)
 
 ```diff
-@@ -36,6 +36,20 @@
+@@ -7,6 +7,8 @@
+ init:
+ 	go install github.com/google/wire/cmd/wire@latest
+ 	go install github.com/bufbuild/buf/cmd/buf@latest
++	go install github.com/yylego/kratos-ts-http/cmd/protoc-gen-kratos-ts-http@latest
++	npm install -g @protobuf-ts/plugin
+ 
+ .PHONY: config
+ # generate internal proto
+@@ -35,6 +37,26 @@
+ 	make api
  	make config
  	make generate
++
++# 从 proto 一步生成浏览器可直接使用的 TypeScript 客户端，产出即是最终代码，无需二次改写。
++# 落到本项目的 bin 下，之后人工拷进前端；`.out` 结尾的目录 Go 的 .gitignore 本就忽略。
++# generate web-safe TypeScript clients from proto; the output is the finished code.
++# It lands under bin here, ready to be copied into the frontend by hand.
++#
++# 依赖的两个插件由 `make init` 一并安装。
++# Both plugins it needs come from `make init`.
++#
++# 想一步直达前端，跑 vue3codegen 那条（路径由 Go 算，不必写死在这里）。
++# For a straight run into the frontend, use vue3codegen: it works the path out in Go.
++web_rpc_ts:
++	buf generate --template buf.gen.ts.yaml --include-imports --clean -o ./bin/web_rpc_ts.out
++
++# 删掉本地产物目录本身。平时用不上——生成那条带 `--clean`，每次已是从零开始，
++# 而 `.out` 结尾的目录 git 本就忽略；只在想彻底腾空这块磁盘时才用它。
++# Removes the local output directory itself. Rarely needed: the generate target passes `--clean`,
++# so each run already starts from nothing, and git ignores `.out` dirs anyway.
++web_rpc_ts_cleanup:
++	rm -rf ./bin/web_rpc_ts.out
  
-+# generate TypeScript gRPC clients from proto files (via buf)
-+# go install github.com/yylego/kratos-vue3/cmd/vue3kratos@latest
-+web_api_grpc_ts:
-+	mkdir -p ./bin/web_api_grpc_ts.out
-+	buf generate --template buf.gen.ts.yaml --include-imports
-+
-+# convert gRPC clients to HTTP clients
-+web_api_grpc_to_http:
-+	vue3kratos gen-grpc-via-http-in-root --grpc-ts-root=./bin/web_api_grpc_ts.out
-+
-+# cleanup generated TypeScript files
-+web_api_cleanup:
-+	rm -rf ./bin/web_api_grpc_ts.out
-+
  # show help
  help:
- 	@echo ''
 ```
 
-## buf.gen.ts.yaml (+10 -0)
+## buf.gen.ts.yaml (+14 -0)
 
 ```diff
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,14 @@
++# 使用 kratos-ts-http 的插件，产出即为最终的 HTTP 形态客户端，无需第二步改写。
++# 落点不在此处指定，由命令行的 -o 决定。
++# Uses the kratos-ts-http plugin, so the output is the finished HTTP-form client.
++# The destination is set on the command line with -o, not here.
 +version: v2
 +inputs:
 +  - directory: api
 +plugins:
-+  - local: protoc-gen-ts
-+    out: bin/web_api_grpc_ts.out
++  - local: protoc-gen-kratos-ts-http
++    out: .
 +    opt:
 +      - ts_nocheck
 +      - eslint_disable
@@ -75,30 +94,34 @@ Code differences compared to source project.
  func newApp(logger *slog.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
 ```
 
-## cmd/demo2kratos/wire_gen.go (+2 -6)
+## cmd/demo2kratos/wire_gen.go (+4 -4)
 
 ```diff
-@@ -28,12 +28,8 @@
+@@ -28,14 +28,14 @@
  	if err != nil {
  		return nil, nil, err
  	}
 -	articleUsecase, err := biz.NewArticleUsecase(dataData, logger)
--	if err != nil {
--		cleanup()
--		return nil, nil, err
--	}
++	uc文章管理, err := biz.NewUc文章管理(dataData, logger)
+ 	if err != nil {
+ 		cleanup()
+ 		return nil, nil, err
+ 	}
 -	articleService := service.NewArticleService(articleUsecase)
-+	uc文章管理 := biz.NewUc文章管理(dataData, logger)
-+	articleService := service.NewArticleService(uc文章管理)
- 	grpcServer := server.NewGRPCServer(confServer, articleService, logger)
- 	httpServer := server.NewHTTPServer(confServer, articleService, logger)
+-	grpcServer := server.NewGRPCServer(confServer, articleService, logger)
+-	httpServer := server.NewHTTPServer(confServer, articleService, logger)
++	svc文章服务 := service.NewSvc文章服务(uc文章管理)
++	grpcServer := server.NewGRPCServer(confServer, svc文章服务, logger)
++	httpServer := server.NewHTTPServer(confServer, svc文章服务, logger)
  	app := newApp(logger, grpcServer, httpServer)
+ 	return app, func() {
+ 		cleanup()
 ```
 
-## internal/biz/article.go (+174 -123)
+## internal/biz/article.go (+202 -122)
 
 ```diff
-@@ -2,187 +2,238 @@
+@@ -2,187 +2,267 @@
  
  import (
  	"context"
@@ -146,7 +169,7 @@ Code differences compared to source project.
 +	data   *data.Data
 +	repo文章 *gormrepo.Repo[models.T文章, *models.T文章Columns]
 +	repo学生 *gormrepo.Repo[models.T学生, *models.T学生Columns]
-+	log    *slog.Logger
++	slog   *slog.Logger
  }
  
 -func NewArticleUsecase(data *data.Data, logger *slog.Logger) (*ArticleUsecase, error) {
@@ -154,15 +177,18 @@ Code differences compared to source project.
 -	// existence check); both services share one database
 -	// 建好本服务拥有的 articles 表，外加镜像的 students 表（供存在性校验用）
 -	if err := data.DB().AutoMigrate(&Article{}, &Student{}); err != nil {
--		return nil, err
-+func NewUc文章管理(data *data.Data, logger *slog.Logger) *Uc文章管理 {
++func NewUc文章管理(data *data.Data, logger *slog.Logger) (*Uc文章管理, error) {
++	// 与学生服务共用一个库：在这里把两张表都建好。
++	if err := data.DB().AutoMigrate(&models.T文章{}, &models.T学生{}); err != nil {
+ 		return nil, err
+ 	}
+-	return &ArticleUsecase{data: data, slog: logger}, nil
 +	return &Uc文章管理{
 +		data:   data,
 +		repo文章: gormrepo.NewRepo(gormclass.Use(&models.T文章{})),
 +		repo学生: gormrepo.NewRepo(gormclass.Use(&models.T学生{})),
-+		log:    logger,
- 	}
--	return &ArticleUsecase{data: data, slog: logger}, nil
++		slog:   logger,
++	}, nil
  }
  
 -func (uc *ArticleUsecase) CreateArticle(ctx context.Context, a *Article) (*Article, *ebzkratos.Ebz) {
@@ -192,7 +218,7 @@ Code differences compared to source project.
 +	// DeleteStudent（它持 FOR UPDATE），绝不创建指向"正被删除的学生"的文章。
 +	if erk, err := gormkratos.Transaction(ctx, db, func(db *gorm.DB) *errors.Error {
 +		if _, erb := uc.repo学生.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
-+			return db.Clauses(clause.Locking{Strength: clause.LockingStrengthShare}).Where(cls.ID.Eq(uint(req.V学生编号)))
++			return db.Clauses(clause.Locking{Strength: clause.LockingStrengthShare}).Where(cls.ID.Eq(req.V学生编号))
 +		}); erb != nil {
 +			if erb.NotExist {
 +				return pb.ErrorBadParam("student %d does not exist", req.V学生编号)
@@ -221,13 +247,14 @@ Code differences compared to source project.
 +		return nil, ebzkratos.New(pb.ErrorTxError("tx: %v", err))
  	}
 -	uc.slog.InfoContext(ctx, "created article", "id", res.ID, "student_id", res.StudentID)
--	return res, nil
-+	return &Req文章信息{
++	res := &Req文章信息{
 +		ID:    int64(v文章.ID),
 +		V标题:   v文章.V标题,
 +		V内容:   v文章.V内容,
 +		V学生编号: v文章.V学生编号,
-+	}, nil
++	}
++	uc.slog.InfoContext(ctx, "created article", "id", res.ID, "student_id", res.V学生编号)
+ 	return res, nil
  }
  
 -func (uc *ArticleUsecase) UpdateArticle(ctx context.Context, a *Article) (*Article, *ebzkratos.Ebz) {
@@ -252,10 +279,11 @@ Code differences compared to source project.
 -				return nil
 +	db := uc.data.DB()
 +
-+	// 与创建相同的 FOR SHARE 锁住新归属学生，再确认文章本身存在，对齐桩子。
++	var v文章 *models.T文章
++	// FOR SHARE 锁住新归属学生（对齐桩子），再更新文章、靠 RowsAffected 判文章不存在，最后 reload——忠实对齐桩子。
 +	if erk, err := gormkratos.Transaction(ctx, db, func(db *gorm.DB) *errors.Error {
 +		if _, erb := uc.repo学生.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
-+			return db.Clauses(clause.Locking{Strength: clause.LockingStrengthShare}).Where(cls.ID.Eq(uint(req.V学生编号)))
++			return db.Clauses(clause.Locking{Strength: clause.LockingStrengthShare}).Where(cls.ID.Eq(req.V学生编号))
 +		}); erb != nil {
 +			if erb.NotExist {
 +				return pb.ErrorBadParam("student %d does not exist", req.V学生编号)
@@ -267,31 +295,31 @@ Code differences compared to source project.
 -			"title":      a.Title,
 -			"content":    a.Content,
 -			"student_id": a.StudentID,
--		})
--		if upd.Error != nil {
--			return upd.Error
-+		if _, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+			return db.Where(cls.ID.Eq(uint(req.ID)))
-+		}); erb != nil {
-+			if erb.NotExist {
-+				return pb.ErrorArticleNotFound("article %d not found", req.ID)
-+			}
-+			return pb.ErrorDbError("get article: %v", erb.Cause)
- 		}
--		if upd.RowsAffected == 0 {
--			articleMissing = true
--			return nil
-+		if err := uc.repo文章.With(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+			return db.Where(cls.ID.Eq(uint(req.ID)))
++		upd := uc.repo文章.Wrap(ctx, db).UpdatesM(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db.Where(cls.ID.Eq(req.ID))
 +		}, func(cls *models.T文章Columns) gormcnm.ColumnValueMap {
 +			return cls.Kw(cls.V标题.Kv(req.V标题)).Kw(cls.V内容.Kv(req.V内容)).Kw(cls.V学生编号.Kv(req.V学生编号))
-+		}); err != nil {
-+			return pb.ErrorDbError("update article: %v", err)
+ 		})
+ 		if upd.Error != nil {
+-			return upd.Error
++			return pb.ErrorDbError("update article: %v", upd.Error)
+ 		}
+ 		if upd.RowsAffected == 0 {
+-			articleMissing = true
+-			return nil
++			return pb.ErrorArticleNotFound("article %d not found", req.ID)
  		}
 -		return db.First(res, a.ID).Error
 -	})
 -	if err != nil {
 -		return nil, ebzkratos.New(pb.ErrorDbError("update article: %v", err))
++		got, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++			return db.Where(cls.ID.Eq(req.ID))
++		})
++		if erb != nil {
++			return pb.ErrorDbError("reload article: %v", erb.Cause)
++		}
++		v文章 = got
 +		return nil
 +	}); err != nil {
 +		if erk != nil {
@@ -307,54 +335,55 @@ Code differences compared to source project.
 -	}
 -	return res, nil
 +
-+	return req, nil
++	return &Req文章信息{
++		ID:    int64(v文章.ID),
++		V标题:   v文章.V标题,
++		V内容:   v文章.V内容,
++		V学生编号: v文章.V学生编号,
++	}, nil
  }
  
 -func (uc *ArticleUsecase) DeleteArticle(ctx context.Context, id int64) *ebzkratos.Ebz {
-+func (uc *Uc文章管理) Xqt删除文章(ctx context.Context, id int64) *ebzkratos.Ebz {
- 	must.True(id > 0)
+-	must.True(id > 0)
++func (uc *Uc文章管理) Xqt删除文章(ctx context.Context, n编号 int64) *ebzkratos.Ebz {
++	must.True(n编号 > 0)
  
 -	del := uc.data.DB().WithContext(ctx).Delete(&Article{}, id)
--	if del.Error != nil {
--		return ebzkratos.New(pb.ErrorDbError("delete article: %v", del.Error))
 +	db := uc.data.DB()
 +
-+	// 先确认文章存在，对齐桩子：查不到返回 ArticleNotFound
-+	if _, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Where(cls.ID.Eq(uint(id)))
-+	}); erb != nil {
-+		if erb.NotExist {
-+			return ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", id))
-+		}
-+		return ebzkratos.New(pb.ErrorDbError("get article: %v", erb.Cause))
++	// 忠实翻译桩子：单条删除后靠 RowsAffected 判不存在（0 行→ArticleNotFound）。
++	del := uc.repo文章.Wrap(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
++		return db.Where(cls.ID.Eq(n编号))
++	})
+ 	if del.Error != nil {
+ 		return ebzkratos.New(pb.ErrorDbError("delete article: %v", del.Error))
  	}
--	if del.RowsAffected == 0 {
+ 	if del.RowsAffected == 0 {
 -		return ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", id))
-+
-+	if err := uc.repo文章.With(ctx, db).DeleteW(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Where(cls.ID.Eq(uint(id)))
-+	}); err != nil {
-+		return ebzkratos.New(pb.ErrorDbError("delete article: %v", err))
++		return ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", n编号))
  	}
 -	uc.slog.InfoContext(ctx, "deleted article", "id", id)
++	uc.slog.InfoContext(ctx, "deleted article", "id", n编号)
  	return nil
  }
  
 -func (uc *ArticleUsecase) GetArticle(ctx context.Context, id int64) (*Article, *ebzkratos.Ebz) {
-+func (uc *Uc文章管理) Get获取文章(ctx context.Context, id int64) (*Req文章信息, *ebzkratos.Ebz) {
- 	must.True(id > 0)
+-	must.True(id > 0)
++func (uc *Uc文章管理) Get获取文章(ctx context.Context, n编号 int64) (*Req文章信息, *ebzkratos.Ebz) {
++	must.True(n编号 > 0)
  
 -	res := &Article{}
 -	if err := uc.data.DB().WithContext(ctx).First(res, id).Error; err != nil {
 -		if errors.Is(err, gorm.ErrRecordNotFound) {
+-			return nil, ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", id))
 +	db := uc.data.DB()
 +
 +	v文章, erb := uc.repo文章.With(ctx, db).FirstE(func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+		return db.Where(cls.ID.Eq(uint(id)))
++		return db.Where(cls.ID.Eq(n编号))
 +	})
 +	if erb != nil {
 +		if erb.NotExist {
- 			return nil, ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", id))
++			return nil, ebzkratos.New(pb.ErrorArticleNotFound("article %d not found", n编号))
  		}
 -		return nil, ebzkratos.New(pb.ErrorDbError("get article: %v", err))
 +		return nil, ebzkratos.New(pb.ErrorDbError("get article: %v", erb.Cause))
@@ -370,20 +399,33 @@ Code differences compared to source project.
  }
  
 -func (uc *ArticleUsecase) ListArticles(ctx context.Context, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
-+func (uc *Uc文章管理) Get文章列表(ctx context.Context, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
- 	must.True(page >= 1)
- 	must.True(pageSize >= 1)
+-	must.True(page >= 1)
+-	must.True(pageSize >= 1)
++// Req文章列表 / Res文章列表 分别包裹「查询文章列表」的入参（分页）与返回（当页数据+总数）。
++type Req文章列表 struct {
++	V页码   int32
++	V每页大小 int32
++}
  
 -	db := uc.data.DB().WithContext(ctx)
-+	db := uc.data.DB()
++type Res文章列表 struct {
++	V文章列表 []*Req文章信息
++	V总数   int32
++}
  
 -	var count int64
 -	if err := db.Model(&Article{}).Count(&count).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count articles: %v", err))
 -	}
--
++func (uc *Uc文章管理) Get文章列表(ctx context.Context, req *Req文章列表) (*Res文章列表, *ebzkratos.Ebz) {
++	must.True(req.V页码 >= 1)
++	must.True(req.V每页大小 >= 1)
+ 
 -	var items []*Article
 -	if err := db.Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
+-		return nil, 0, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
++	db := uc.data.DB()
++
 +	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
 +	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 +		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
@@ -393,16 +435,16 @@ Code differences compared to source project.
 +			return cls.ID.Ob("asc")
 +		},
 +		&gormrepo.Pagination{
-+			Offset: int((page - 1) * pageSize),
-+			Limit:  int(pageSize),
++			Offset: int((req.V页码 - 1) * req.V每页大小),
++			Limit:  int(req.V每页大小),
 +		},
 +	)
 +	if err != nil {
- 		return nil, 0, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
++		return nil, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
  	}
 -	return items, int32(count), nil
 +
-+	return conv文章列表(v文章们), int32(total), nil
++	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
  }
  
 -// ListStudentArticles returns one student's articles, one page at a time. The
@@ -413,38 +455,47 @@ Code differences compared to source project.
 -// 而不是往 ListArticles 上塞过滤参数。
 -func (uc *ArticleUsecase) ListStudentArticles(ctx context.Context, studentID int64, page int32, pageSize int32) ([]*Article, int32, *ebzkratos.Ebz) {
 -	must.True(studentID > 0)
-+// Get学生文章列表 分页返回某个学生的文章（对应 proto 的 ListStudentArticles）。
-+func (uc *Uc文章管理) Get学生文章列表(ctx context.Context, v学生编号 int64, page int32, pageSize int32) ([]*Req文章信息, int32, *ebzkratos.Ebz) {
-+	must.True(v学生编号 > 0)
- 	must.True(page >= 1)
- 	must.True(pageSize >= 1)
+-	must.True(page >= 1)
+-	must.True(pageSize >= 1)
++// Req学生文章列表 包裹「查询某学生的文章列表」的入参（学生编号+分页），返回复用 Res文章列表。
++type Req学生文章列表 struct {
++	V学生编号 int64
++	V页码   int32
++	V每页大小 int32
++}
  
 -	db := uc.data.DB().WithContext(ctx)
-+	db := uc.data.DB()
++// Get学生文章列表 分页返回某个学生的文章（对应 proto 的 ListStudentArticles）。
++func (uc *Uc文章管理) Get学生文章列表(ctx context.Context, req *Req学生文章列表) (*Res文章列表, *ebzkratos.Ebz) {
++	must.True(req.V学生编号 > 0)
++	must.True(req.V页码 >= 1)
++	must.True(req.V每页大小 >= 1)
  
 -	var count int64
 -	if err := db.Model(&Article{}).Where("student_id = ?", studentID).Count(&count).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count student articles: %v", err))
++	db := uc.data.DB()
++
 +	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 +		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
-+			return db.Where(cls.V学生编号.Eq(v学生编号))
++			return db.Where(cls.V学生编号.Eq(req.V学生编号))
 +		},
 +		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
 +			return cls.ID.Ob("asc")
 +		},
 +		&gormrepo.Pagination{
-+			Offset: int((page - 1) * pageSize),
-+			Limit:  int(pageSize),
++			Offset: int((req.V页码 - 1) * req.V每页大小),
++			Limit:  int(req.V每页大小),
 +		},
 +	)
 +	if err != nil {
-+		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
++		return nil, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
  	}
  
 -	var items []*Article
 -	if err := db.Where("student_id = ?", studentID).Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
-+	return conv文章列表(v文章们), int32(total), nil
++	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
 +}
 +
 +func conv文章列表(v文章们 []*models.T文章) []*Req文章信息 {
@@ -473,60 +524,17 @@ Code differences compared to source project.
 +var ProviderSet = wire.NewSet(NewUc文章管理)
 ```
 
-## internal/data/data.go (+9 -8)
+## internal/pkg/models/article.go (+12 -0)
 
 ```diff
-@@ -5,6 +5,7 @@
- 
- 	"github.com/google/wire"
- 	"github.com/yylego/kratos-examples/demo2kratos/internal/conf"
-+	"github.com/yylego/kratos-examples/demo2kratos/internal/pkg/models"
- 	"github.com/yylego/must"
- 	"github.com/yylego/rese"
- 	"gorm.io/driver/postgres"
-@@ -17,19 +18,19 @@
- 	db *gorm.DB
- }
- 
--// DB exposes the underlying gorm handle so the biz code can run true queries.
--//
--// DB 暴露底层 gorm 句柄，供 biz 层执行真实的数据库读写
--func (d *Data) DB() *gorm.DB {
--	return d.db
--}
--
- func NewData(c *conf.Data, logger *slog.Logger) (*Data, func(), error) {
- 	must.Same(c.Database.Driver, "postgres")
- 	db := rese.P1(gorm.Open(postgres.Open(c.Database.Source), &gorm.Config{}))
-+
-+	must.Done(db.AutoMigrate(&models.T文章{}, &models.T学生{}))
-+
- 	cleanup := func() {
- 		logger.Info("closing the data resources")
--		_ = rese.P1(db.DB()).Close()
-+		must.Done(rese.P1(db.DB()).Close())
- 	}
- 	return &Data{db: db}, cleanup, nil
-+}
-+
-+func (d *Data) DB() *gorm.DB {
-+	return d.db
- }
-```
-
-## internal/pkg/models/article.go (+14 -0)
-
-```diff
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,12 @@
 +package models
 +
-+import "gorm.io/gorm"
-+
 +type T文章 struct {
-+	gorm.Model
-+	V标题   string `gorm:"column:title;type:varchar(255)" cnm:"V标题"`
-+	V内容   string `gorm:"column:content;type:text" cnm:"V内容"`
-+	V学生编号 int64  `gorm:"column:student_id;type:bigint" cnm:"V学生编号"`
++	ID    int64  `gorm:"primaryKey;autoIncrement"`
++	V标题   string `gorm:"column:title;size:256;not null"`
++	V内容   string `gorm:"column:content;type:text"`
++	V学生编号 int64  `gorm:"column:student_id;index:idx_articles_student_id"`
 +}
 +
 +func (*T文章) TableName() string {
@@ -534,10 +542,10 @@ Code differences compared to source project.
 +}
 ```
 
-## internal/pkg/models/gormcnm.gen.go (+71 -0)
+## internal/pkg/models/gormcnm.gen.go (+56 -0)
 
 ```diff
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,56 @@
 +// Code generated using gormcngen. DO NOT EDIT.
 +// This file was auto generated via github.com/yylego/gormcngen
 +
@@ -552,22 +560,16 @@ Code differences compared to source project.
 +package models
 +
 +import (
-+	"time"
-+
 +	"github.com/yylego/gormcnm"
-+	"gorm.io/gorm"
 +)
 +
 +func (c *T文章) Columns() *T文章Columns {
 +	return &T文章Columns{
 +		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-+		ID:        gormcnm.Cnm(c.ID, "id"),
-+		CreatedAt: gormcnm.Cnm(c.CreatedAt, "created_at"),
-+		UpdatedAt: gormcnm.Cnm(c.UpdatedAt, "updated_at"),
-+		DeletedAt: gormcnm.Cnm(c.DeletedAt, "deleted_at"),
-+		V标题:       gormcnm.Cnm(c.V标题, "title"),
-+		V内容:       gormcnm.Cnm(c.V内容, "content"),
-+		V学生编号:     gormcnm.Cnm(c.V学生编号, "student_id"),
++		ID:    gormcnm.Cnm(c.ID, "id"),
++		V标题:   gormcnm.Cnm(c.V标题, "title"),
++		V内容:   gormcnm.Cnm(c.V内容, "content"),
++		V学生编号: gormcnm.Cnm(c.V学生编号, "student_id"),
 +	}
 +}
 +
@@ -575,25 +577,19 @@ Code differences compared to source project.
 +	// Auto-generated: embedding operation functions to make it simple to use. DO NOT EDIT. // 自动生成：嵌入操作函数便于使用。请勿编辑。
 +	gormcnm.ColumnOperationClass
 +	// Auto-generated: column names and types in database table. DO NOT EDIT. // 自动生成：数据库表的列名和类型。请勿编辑。
-+	ID        gormcnm.ColumnName[uint]
-+	CreatedAt gormcnm.ColumnName[time.Time]
-+	UpdatedAt gormcnm.ColumnName[time.Time]
-+	DeletedAt gormcnm.ColumnName[gorm.DeletedAt]
-+	V标题       gormcnm.ColumnName[string]
-+	V内容       gormcnm.ColumnName[string]
-+	V学生编号     gormcnm.ColumnName[int64]
++	ID    gormcnm.ColumnName[int64]
++	V标题   gormcnm.ColumnName[string]
++	V内容   gormcnm.ColumnName[string]
++	V学生编号 gormcnm.ColumnName[int64]
 +}
 +
 +func (c *T学生) Columns() *T学生Columns {
 +	return &T学生Columns{
 +		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-+		ID:        gormcnm.Cnm(c.ID, "id"),
-+		CreatedAt: gormcnm.Cnm(c.CreatedAt, "created_at"),
-+		UpdatedAt: gormcnm.Cnm(c.UpdatedAt, "updated_at"),
-+		DeletedAt: gormcnm.Cnm(c.DeletedAt, "deleted_at"),
-+		V名字:       gormcnm.Cnm(c.V名字, "name"),
-+		V年龄:       gormcnm.Cnm(c.V年龄, "age"),
-+		V班级:       gormcnm.Cnm(c.V班级, "class_name"),
++		ID:  gormcnm.Cnm(c.ID, "id"),
++		V名字: gormcnm.Cnm(c.V名字, "name"),
++		V年龄: gormcnm.Cnm(c.V年龄, "age"),
++		V班级: gormcnm.Cnm(c.V班级, "class_name"),
 +	}
 +}
 +
@@ -601,13 +597,10 @@ Code differences compared to source project.
 +	// Auto-generated: embedding operation functions to make it simple to use. DO NOT EDIT. // 自动生成：嵌入操作函数便于使用。请勿编辑。
 +	gormcnm.ColumnOperationClass
 +	// Auto-generated: column names and types in database table. DO NOT EDIT. // 自动生成：数据库表的列名和类型。请勿编辑。
-+	ID        gormcnm.ColumnName[uint]
-+	CreatedAt gormcnm.ColumnName[time.Time]
-+	UpdatedAt gormcnm.ColumnName[time.Time]
-+	DeletedAt gormcnm.ColumnName[gorm.DeletedAt]
-+	V名字       gormcnm.ColumnName[string]
-+	V年龄       gormcnm.ColumnName[int32]
-+	V班级       gormcnm.ColumnName[string]
++	ID  gormcnm.ColumnName[int64]
++	V名字 gormcnm.ColumnName[string]
++	V年龄 gormcnm.ColumnName[int32]
++	V班级 gormcnm.ColumnName[string]
 +}
 ```
 
@@ -654,19 +647,17 @@ Code differences compared to source project.
 +}
 ```
 
-## internal/pkg/models/student.go (+14 -0)
+## internal/pkg/models/student.go (+12 -0)
 
 ```diff
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,12 @@
 +package models
 +
-+import "gorm.io/gorm"
-+
 +type T学生 struct {
-+	gorm.Model
-+	V名字 string `gorm:"column:name;type:varchar(255)" cnm:"V名字"`
-+	V年龄 int32  `gorm:"column:age;type:int" cnm:"V年龄"`
-+	V班级 string `gorm:"column:class_name;type:varchar(255)" cnm:"V班级"`
++	ID  int64  `gorm:"primaryKey;autoIncrement"`
++	V名字 string `gorm:"column:name;size:128;not null"`
++	V年龄 int32  `gorm:"column:age"`
++	V班级 string `gorm:"column:class_name;size:128"`
 +}
 +
 +func (*T学生) TableName() string {
@@ -674,11 +665,43 @@ Code differences compared to source project.
 +}
 ```
 
-## internal/service/article.go (+24 -30)
+## internal/server/grpc.go (+1 -1)
 
 ```diff
-@@ -10,10 +10,10 @@
- type ArticleService struct {
+@@ -10,7 +10,7 @@
+ 	"github.com/yylego/kratos-examples/demo2kratos/internal/service"
+ )
+ 
+-func NewGRPCServer(c *conf.Server, article *service.ArticleService, logger *slog.Logger) *grpc.Server {
++func NewGRPCServer(c *conf.Server, article *service.Svc文章服务, logger *slog.Logger) *grpc.Server {
+ 	var opts = []grpc.ServerOption{
+ 		grpc.Middleware(
+ 			recovery.Recovery(),
+```
+
+## internal/server/http.go (+1 -1)
+
+```diff
+@@ -10,7 +10,7 @@
+ 	"github.com/yylego/kratos-examples/demo2kratos/internal/service"
+ )
+ 
+-func NewHTTPServer(c *conf.Server, article *service.ArticleService, logger *slog.Logger) *http.Server {
++func NewHTTPServer(c *conf.Server, article *service.Svc文章服务, logger *slog.Logger) *http.Server {
+ 	var opts = []http.ServerOption{
+ 		http.Middleware(
+ 			recovery.Recovery(),
+```
+
+## internal/service/article.go (+34 -34)
+
+```diff
+@@ -7,35 +7,35 @@
+ 	"github.com/yylego/kratos-examples/demo2kratos/internal/biz"
+ )
+ 
+-type ArticleService struct {
++type Svc文章服务 struct {
  	pb.UnimplementedArticleServiceServer
  
 -	uc *biz.ArticleUsecase
@@ -686,17 +709,19 @@ Code differences compared to source project.
  }
  
 -func NewArticleService(uc *biz.ArticleUsecase) *ArticleService {
-+func NewArticleService(uc *biz.Uc文章管理) *ArticleService {
- 	return &ArticleService{uc: uc}
+-	return &ArticleService{uc: uc}
++func NewSvc文章服务(uc *biz.Uc文章管理) *Svc文章服务 {
++	return &Svc文章服务{uc: uc}
  }
  
-@@ -21,18 +21,15 @@
+-func (s *ArticleService) CreateArticle(ctx context.Context, req *pb.CreateArticleRequest) (*pb.CreateArticleReply, error) {
++func (s *Svc文章服务) CreateArticle(ctx context.Context, req *pb.CreateArticleRequest) (*pb.CreateArticleReply, error) {
  	if req.Title == "" {
  		return nil, pb.ErrorBadParam("TITLE IS REQUIRED")
  	}
--	if req.StudentId <= 0 {
--		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
--	}
+ 	if req.StudentId <= 0 {
+ 		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+ 	}
 -	v, ebz := s.uc.CreateArticle(ctx, &biz.Article{
 -		Title:     req.Title,
 -		Content:   req.Content,
@@ -713,14 +738,15 @@ Code differences compared to source project.
 +	return &pb.CreateArticleReply{Article: &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号}}, nil
  }
  
- func (s *ArticleService) UpdateArticle(ctx context.Context, req *pb.UpdateArticleRequest) (*pb.UpdateArticleReply, error) {
-@@ -42,26 +39,23 @@
- 	if req.Title == "" {
- 		return nil, pb.ErrorBadParam("TITLE IS REQUIRED")
+-func (s *ArticleService) UpdateArticle(ctx context.Context, req *pb.UpdateArticleRequest) (*pb.UpdateArticleReply, error) {
++func (s *Svc文章服务) UpdateArticle(ctx context.Context, req *pb.UpdateArticleRequest) (*pb.UpdateArticleReply, error) {
+ 	if req.Id <= 0 {
+ 		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
--	if req.StudentId <= 0 {
--		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
--	}
+@@ -45,58 +45,58 @@
+ 	if req.StudentId <= 0 {
+ 		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+ 	}
 -	v, ebz := s.uc.UpdateArticle(ctx, &biz.Article{
 -		ID:        req.Id,
 -		Title:     req.Title,
@@ -739,7 +765,8 @@ Code differences compared to source project.
 +	return &pb.UpdateArticleReply{Article: &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号}}, nil
  }
  
- func (s *ArticleService) DeleteArticle(ctx context.Context, req *pb.DeleteArticleRequest) (*pb.DeleteArticleReply, error) {
+-func (s *ArticleService) DeleteArticle(ctx context.Context, req *pb.DeleteArticleRequest) (*pb.DeleteArticleReply, error) {
++func (s *Svc文章服务) DeleteArticle(ctx context.Context, req *pb.DeleteArticleRequest) (*pb.DeleteArticleReply, error) {
  	if req.Id <= 0 {
  		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
@@ -748,7 +775,10 @@ Code differences compared to source project.
  		return nil, ebz.Erk
  	}
  	return &pb.DeleteArticleReply{Success: true}, nil
-@@ -71,11 +65,11 @@
+ }
+ 
+-func (s *ArticleService) GetArticle(ctx context.Context, req *pb.GetArticleRequest) (*pb.GetArticleReply, error) {
++func (s *Svc文章服务) GetArticle(ctx context.Context, req *pb.GetArticleRequest) (*pb.GetArticleReply, error) {
  	if req.Id <= 0 {
  		return nil, pb.ErrorBadParam("ID IS REQUIRED")
  	}
@@ -761,42 +791,64 @@ Code differences compared to source project.
 +	return &pb.GetArticleReply{Article: &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号}}, nil
  }
  
- func (s *ArticleService) ListArticles(ctx context.Context, req *pb.ListArticlesRequest) (*pb.ListArticlesReply, error) {
-@@ -85,13 +79,13 @@
+-func (s *ArticleService) ListArticles(ctx context.Context, req *pb.ListArticlesRequest) (*pb.ListArticlesReply, error) {
++func (s *Svc文章服务) ListArticles(ctx context.Context, req *pb.ListArticlesRequest) (*pb.ListArticlesReply, error) {
+ 	if req.Page < 1 {
+ 		return nil, pb.ErrorBadParam("PAGE MUST BE POSITIVE")
+ 	}
  	if req.PageSize < 1 {
  		return nil, pb.ErrorBadParam("PAGE_SIZE MUST BE POSITIVE")
  	}
 -	articles, count, ebz := s.uc.ListArticles(ctx, req.Page, req.PageSize)
-+	a文章列表, count, ebz := s.uc.Get文章列表(ctx, req.Page, req.PageSize)
++	res, ebz := s.uc.Get文章列表(ctx, &biz.Req文章列表{V页码: req.Page, V每页大小: req.PageSize})
  	if ebz != nil {
  		return nil, ebz.Erk
  	}
 -	items := make([]*pb.ArticleInfo, 0, len(articles))
 -	for _, v := range articles {
 -		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.Title, Content: v.Content, StudentId: v.StudentID})
-+	items := make([]*pb.ArticleInfo, 0, len(a文章列表))
-+	for _, v := range a文章列表 {
++	items := make([]*pb.ArticleInfo, 0, len(res.V文章列表))
++	for _, v := range res.V文章列表 {
 +		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号})
  	}
- 	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
+-	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
++	return &pb.ListArticlesReply{Articles: items, Count: res.V总数}, nil
  }
-@@ -106,13 +100,13 @@
+ 
+-func (s *ArticleService) ListStudentArticles(ctx context.Context, req *pb.ListStudentArticlesRequest) (*pb.ListArticlesReply, error) {
++func (s *Svc文章服务) ListStudentArticles(ctx context.Context, req *pb.ListStudentArticlesRequest) (*pb.ListArticlesReply, error) {
+ 	if req.StudentId <= 0 {
+ 		return nil, pb.ErrorBadParam("STUDENT_ID IS REQUIRED")
+ 	}
+@@ -106,13 +106,13 @@
  	if req.PageSize < 1 {
  		return nil, pb.ErrorBadParam("PAGE_SIZE MUST BE POSITIVE")
  	}
 -	articles, count, ebz := s.uc.ListStudentArticles(ctx, req.StudentId, req.Page, req.PageSize)
-+	a文章列表, count, ebz := s.uc.Get学生文章列表(ctx, req.StudentId, req.Page, req.PageSize)
++	res, ebz := s.uc.Get学生文章列表(ctx, &biz.Req学生文章列表{V学生编号: req.StudentId, V页码: req.Page, V每页大小: req.PageSize})
  	if ebz != nil {
  		return nil, ebz.Erk
  	}
 -	items := make([]*pb.ArticleInfo, 0, len(articles))
 -	for _, v := range articles {
 -		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.Title, Content: v.Content, StudentId: v.StudentID})
-+	items := make([]*pb.ArticleInfo, 0, len(a文章列表))
-+	for _, v := range a文章列表 {
++	items := make([]*pb.ArticleInfo, 0, len(res.V文章列表))
++	for _, v := range res.V文章列表 {
 +		items = append(items, &pb.ArticleInfo{Id: v.ID, Title: v.V标题, Content: v.V内容, StudentId: v.V学生编号})
  	}
- 	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
+-	return &pb.ListArticlesReply{Articles: items, Count: count}, nil
++	return &pb.ListArticlesReply{Articles: items, Count: res.V总数}, nil
  }
+```
+
+## internal/service/service.go (+1 -1)
+
+```diff
+@@ -2,4 +2,4 @@
+ 
+ import "github.com/google/wire"
+ 
+-var ProviderSet = wire.NewSet(NewArticleService)
++var ProviderSet = wire.NewSet(NewSvc文章服务)
 ```
 

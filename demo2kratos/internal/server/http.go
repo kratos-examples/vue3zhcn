@@ -10,7 +10,7 @@ import (
 	"github.com/yylego/kratos-examples/demo2kratos/internal/service"
 )
 
-func NewHTTPServer(c *conf.Server, article *service.ArticleService, logger *slog.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, article *service.Svc文章服务, logger *slog.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),

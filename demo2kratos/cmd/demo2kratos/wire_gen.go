@@ -28,10 +28,14 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger *slog.Logger) 
 	if err != nil {
 		return nil, nil, err
 	}
-	uc文章管理 := biz.NewUc文章管理(dataData, logger)
-	articleService := service.NewArticleService(uc文章管理)
-	grpcServer := server.NewGRPCServer(confServer, articleService, logger)
-	httpServer := server.NewHTTPServer(confServer, articleService, logger)
+	uc文章管理, err := biz.NewUc文章管理(dataData, logger)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	svc文章服务 := service.NewSvc文章服务(uc文章管理)
+	grpcServer := server.NewGRPCServer(confServer, svc文章服务, logger)
+	httpServer := server.NewHTTPServer(confServer, svc文章服务, logger)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, func() {
 		cleanup()
