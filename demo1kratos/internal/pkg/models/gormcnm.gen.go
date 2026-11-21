@@ -3,7 +3,7 @@
 
 //go:build !gormcngen_generate
 
-// Generated from: gormcnm.gen_test.go:35 -> models_test.TestGenerateColumns
+// Generated from: gormcnm.gen_test.go:32 -> models_test.TestGenerateColumns
 // ========== GORMCNGEN:DO-NOT-EDIT-MARKER:END ==========
 
 // Code generated using gormcngen. DO NOT EDIT.
@@ -16,13 +16,7 @@ import (
 )
 
 func (c *T学生) Columns() *T学生Columns {
-	return &T学生Columns{
-		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-		ID:  gormcnm.Cnm(c.ID, "id"),
-		V名字: gormcnm.Cnm(c.V名字, "name"),
-		V年龄: gormcnm.Cnm(c.V年龄, "age"),
-		V班级: gormcnm.Cnm(c.V班级, "class_name"),
-	}
+	return c.TableColumns(gormcnm.NewPlainDecoration())
 }
 
 type T学生Columns struct {
@@ -36,13 +30,7 @@ type T学生Columns struct {
 }
 
 func (c *T文章) Columns() *T文章Columns {
-	return &T文章Columns{
-		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-		ID:    gormcnm.Cnm(c.ID, "id"),
-		V标题:   gormcnm.Cnm(c.V标题, "title"),
-		V内容:   gormcnm.Cnm(c.V内容, "content"),
-		V学生编号: gormcnm.Cnm(c.V学生编号, "student_id"),
-	}
+	return c.TableColumns(gormcnm.NewPlainDecoration())
 }
 
 type T文章Columns struct {
@@ -53,4 +41,24 @@ type T文章Columns struct {
 	V标题   gormcnm.ColumnName[string]
 	V内容   gormcnm.ColumnName[string]
 	V学生编号 gormcnm.ColumnName[int64]
+}
+
+func (c *T学生) TableColumns(decoration gormcnm.ColumnNameDecoration) *T学生Columns {
+	return &T学生Columns{
+		// Auto-generated: column mapping in table operations. DO NOT EDIT. // 自动生成：表操作的列映射。请勿编辑。
+		ID:  gormcnm.Cmn(c.ID, "id", decoration),
+		V名字: gormcnm.Cmn(c.V名字, "name", decoration),
+		V年龄: gormcnm.Cmn(c.V年龄, "age", decoration),
+		V班级: gormcnm.Cmn(c.V班级, "class_name", decoration),
+	}
+}
+
+func (c *T文章) TableColumns(decoration gormcnm.ColumnNameDecoration) *T文章Columns {
+	return &T文章Columns{
+		// Auto-generated: column mapping in table operations. DO NOT EDIT. // 自动生成：表操作的列映射。请勿编辑。
+		ID:    gormcnm.Cmn(c.ID, "id", decoration),
+		V标题:   gormcnm.Cmn(c.V标题, "title", decoration),
+		V内容:   gormcnm.Cmn(c.V内容, "content", decoration),
+		V学生编号: gormcnm.Cmn(c.V学生编号, "student_id", decoration),
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/yylego/kratos-examples/demo1kratos/internal/pkg/models"
 	"github.com/yylego/kratos-gorm/gormkratos"
 	"github.com/yylego/must"
+	"github.com/yylego/rese"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -191,17 +192,14 @@ func (uc *Uc学生管理) Get学生列表(ctx context.Context, req *Req学生列
 	db := uc.data.DB()
 
 	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
-	v学生们, total, err := uc.repo学生.With(ctx, db).FindPageAndCount(
+	v学生们, count, err := uc.repo学生.With(ctx, db).FindPageAndCount(
 		func(db *gorm.DB, cls *models.T学生Columns) *gorm.DB {
 			return db
 		},
-		func(cls *models.T学生Columns) gormcnm.OrderByBottle {
+		func(cls *models.T学生Columns) gormcnm.Ordering {
 			return cls.ID.Ob("asc")
 		},
-		&gormrepo.Pagination{
-			Offset: int((req.V页码 - 1) * req.V每页大小),
-			Limit:  int(req.V每页大小),
-		},
+		rese.P1(gormrepo.NewPagination(int(req.V页码), int(req.V每页大小))),
 	)
 	if err != nil {
 		return nil, ebzkratos.New(pb.ErrorDbError("list students: %v", err))
@@ -216,5 +214,5 @@ func (uc *Uc学生管理) Get学生列表(ctx context.Context, req *Req学生列
 			V班级: v.V班级,
 		})
 	}
-	return &Res学生列表{V学生列表: a学生列表, V总数: int32(total)}, nil
+	return &Res学生列表{V学生列表: a学生列表, V总数: int32(count)}, nil
 }

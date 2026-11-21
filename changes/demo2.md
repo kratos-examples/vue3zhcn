@@ -118,10 +118,10 @@ Code differences compared to source project.
  		cleanup()
 ```
 
-## internal/biz/article.go (+202 -122)
+## internal/biz/article.go (+197 -122)
 
 ```diff
-@@ -2,187 +2,267 @@
+@@ -2,187 +2,262 @@
  
  import (
  	"context"
@@ -138,6 +138,7 @@ Code differences compared to source project.
 +	"github.com/yylego/kratos-examples/demo2kratos/internal/pkg/models"
 +	"github.com/yylego/kratos-gorm/gormkratos"
  	"github.com/yylego/must"
++	"github.com/yylego/rese"
  	"gorm.io/gorm"
  	"gorm.io/gorm/clause"
  )
@@ -427,24 +428,21 @@ Code differences compared to source project.
 +	db := uc.data.DB()
 +
 +	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
-+	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
++	v文章们, count, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 +		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 +			return db
 +		},
-+		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
++		func(cls *models.T文章Columns) gormcnm.Ordering {
 +			return cls.ID.Ob("asc")
 +		},
-+		&gormrepo.Pagination{
-+			Offset: int((req.V页码 - 1) * req.V每页大小),
-+			Limit:  int(req.V每页大小),
-+		},
++		rese.P1(gormrepo.NewPagination(int(req.V页码), int(req.V每页大小))),
 +	)
 +	if err != nil {
 +		return nil, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
  	}
 -	return items, int32(count), nil
 +
-+	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
++	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(count)}, nil
  }
  
 -// ListStudentArticles returns one student's articles, one page at a time. The
@@ -476,17 +474,14 @@ Code differences compared to source project.
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("count student articles: %v", err))
 +	db := uc.data.DB()
 +
-+	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
++	v文章们, count, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 +		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 +			return db.Where(cls.V学生编号.Eq(req.V学生编号))
 +		},
-+		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
++		func(cls *models.T文章Columns) gormcnm.Ordering {
 +			return cls.ID.Ob("asc")
 +		},
-+		&gormrepo.Pagination{
-+			Offset: int((req.V页码 - 1) * req.V每页大小),
-+			Limit:  int(req.V每页大小),
-+		},
++		rese.P1(gormrepo.NewPagination(int(req.V页码), int(req.V每页大小))),
 +	)
 +	if err != nil {
 +		return nil, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
@@ -495,7 +490,7 @@ Code differences compared to source project.
 -	var items []*Article
 -	if err := db.Where("student_id = ?", studentID).Order("id").Offset(int((page - 1) * pageSize)).Limit(int(pageSize)).Find(&items).Error; err != nil {
 -		return nil, 0, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
-+	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
++	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(count)}, nil
 +}
 +
 +func conv文章列表(v文章们 []*models.T文章) []*Req文章信息 {
@@ -542,16 +537,16 @@ Code differences compared to source project.
 +}
 ```
 
-## internal/pkg/models/gormcnm.gen.go (+56 -0)
+## internal/pkg/models/gormcnm.gen.go (+64 -0)
 
 ```diff
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,64 @@
 +// Code generated using gormcngen. DO NOT EDIT.
 +// This file was auto generated via github.com/yylego/gormcngen
 +
 +//go:build !gormcngen_generate
 +
-+// Generated from: gormcnm.gen_test.go:35 -> models_test.TestGenerateColumns
++// Generated from: gormcnm.gen_test.go:32 -> models_test.TestGenerateColumns
 +// ========== GORMCNGEN:DO-NOT-EDIT-MARKER:END ==========
 +
 +// Code generated using gormcngen. DO NOT EDIT.
@@ -564,13 +559,7 @@ Code differences compared to source project.
 +)
 +
 +func (c *T文章) Columns() *T文章Columns {
-+	return &T文章Columns{
-+		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-+		ID:    gormcnm.Cnm(c.ID, "id"),
-+		V标题:   gormcnm.Cnm(c.V标题, "title"),
-+		V内容:   gormcnm.Cnm(c.V内容, "content"),
-+		V学生编号: gormcnm.Cnm(c.V学生编号, "student_id"),
-+	}
++	return c.TableColumns(gormcnm.NewPlainDecoration())
 +}
 +
 +type T文章Columns struct {
@@ -584,13 +573,7 @@ Code differences compared to source project.
 +}
 +
 +func (c *T学生) Columns() *T学生Columns {
-+	return &T学生Columns{
-+		// Auto-generated: column names and types mapping. DO NOT EDIT. // 自动生成：列名和类型映射。请勿编辑。
-+		ID:  gormcnm.Cnm(c.ID, "id"),
-+		V名字: gormcnm.Cnm(c.V名字, "name"),
-+		V年龄: gormcnm.Cnm(c.V年龄, "age"),
-+		V班级: gormcnm.Cnm(c.V班级, "class_name"),
-+	}
++	return c.TableColumns(gormcnm.NewPlainDecoration())
 +}
 +
 +type T学生Columns struct {
@@ -602,12 +585,32 @@ Code differences compared to source project.
 +	V年龄 gormcnm.ColumnName[int32]
 +	V班级 gormcnm.ColumnName[string]
 +}
++
++func (c *T文章) TableColumns(decoration gormcnm.ColumnNameDecoration) *T文章Columns {
++	return &T文章Columns{
++		// Auto-generated: column mapping in table operations. DO NOT EDIT. // 自动生成：表操作的列映射。请勿编辑。
++		ID:    gormcnm.Cmn(c.ID, "id", decoration),
++		V标题:   gormcnm.Cmn(c.V标题, "title", decoration),
++		V内容:   gormcnm.Cmn(c.V内容, "content", decoration),
++		V学生编号: gormcnm.Cmn(c.V学生编号, "student_id", decoration),
++	}
++}
++
++func (c *T学生) TableColumns(decoration gormcnm.ColumnNameDecoration) *T学生Columns {
++	return &T学生Columns{
++		// Auto-generated: column mapping in table operations. DO NOT EDIT. // 自动生成：表操作的列映射。请勿编辑。
++		ID:  gormcnm.Cmn(c.ID, "id", decoration),
++		V名字: gormcnm.Cmn(c.V名字, "name", decoration),
++		V年龄: gormcnm.Cmn(c.V年龄, "age", decoration),
++		V班级: gormcnm.Cmn(c.V班级, "class_name", decoration),
++	}
++}
 ```
 
-## internal/pkg/models/gormcnm.gen_test.go (+37 -0)
+## internal/pkg/models/gormcnm.gen_test.go (+34 -0)
 
 ```diff
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,34 @@
 +package models_test
 +
 +import (
@@ -635,11 +638,8 @@ Code differences compared to source project.
 +		&models.T学生{},
 +	}
 +
-+	// Configure generation options with latest best practices
-+	options := gormcngen.NewOptions().
-+		WithColumnClassExportable(true). // Generate exportable column class names like T文章Columns
-+		WithColumnsMethodRecvName("c").  // Set receiver name for column methods
-+		WithColumnsCheckFieldType(true)  // Enable field type checking for type safe
++	// The defaults fit gormrepo: exported T文章Columns, the recv "c", type-checked columns
++	options := gormcngen.NewOptions()
 +
 +	// Create configuration and generate code to target file
 +	cfg := gormcngen.NewConfigs(objects, options, absPath)

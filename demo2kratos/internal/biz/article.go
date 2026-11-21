@@ -14,6 +14,7 @@ import (
 	"github.com/yylego/kratos-examples/demo2kratos/internal/pkg/models"
 	"github.com/yylego/kratos-gorm/gormkratos"
 	"github.com/yylego/must"
+	"github.com/yylego/rese"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -201,23 +202,20 @@ func (uc *Uc文章管理) Get文章列表(ctx context.Context, req *Req文章列
 	db := uc.data.DB()
 
 	// gormrepo FindPageAndCount 一次拿到当页数据和总行数，对齐桩子的分页+计数。
-	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
+	v文章们, count, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 			return db
 		},
-		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
+		func(cls *models.T文章Columns) gormcnm.Ordering {
 			return cls.ID.Ob("asc")
 		},
-		&gormrepo.Pagination{
-			Offset: int((req.V页码 - 1) * req.V每页大小),
-			Limit:  int(req.V每页大小),
-		},
+		rese.P1(gormrepo.NewPagination(int(req.V页码), int(req.V每页大小))),
 	)
 	if err != nil {
 		return nil, ebzkratos.New(pb.ErrorDbError("list articles: %v", err))
 	}
 
-	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
+	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(count)}, nil
 }
 
 // Req学生文章列表 包裹「查询某学生的文章列表」的入参（学生编号+分页），返回复用 Res文章列表。
@@ -235,23 +233,20 @@ func (uc *Uc文章管理) Get学生文章列表(ctx context.Context, req *Req学
 
 	db := uc.data.DB()
 
-	v文章们, total, err := uc.repo文章.With(ctx, db).FindPageAndCount(
+	v文章们, count, err := uc.repo文章.With(ctx, db).FindPageAndCount(
 		func(db *gorm.DB, cls *models.T文章Columns) *gorm.DB {
 			return db.Where(cls.V学生编号.Eq(req.V学生编号))
 		},
-		func(cls *models.T文章Columns) gormcnm.OrderByBottle {
+		func(cls *models.T文章Columns) gormcnm.Ordering {
 			return cls.ID.Ob("asc")
 		},
-		&gormrepo.Pagination{
-			Offset: int((req.V页码 - 1) * req.V每页大小),
-			Limit:  int(req.V每页大小),
-		},
+		rese.P1(gormrepo.NewPagination(int(req.V页码), int(req.V每页大小))),
 	)
 	if err != nil {
 		return nil, ebzkratos.New(pb.ErrorDbError("list student articles: %v", err))
 	}
 
-	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(total)}, nil
+	return &Res文章列表{V文章列表: conv文章列表(v文章们), V总数: int32(count)}, nil
 }
 
 func conv文章列表(v文章们 []*models.T文章) []*Req文章信息 {

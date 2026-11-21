@@ -25,11 +25,8 @@ func TestGenerateColumns(t *testing.T) {
 		&models.T文章{},
 	}
 
-	// Configure generation options with latest best practices
-	options := gormcngen.NewOptions().
-		WithColumnClassExportable(true). // Generate exportable column class names like T学生Columns
-		WithColumnsMethodRecvName("c").  // Set receiver name for column methods
-		WithColumnsCheckFieldType(true)  // Enable field type checking for type safe
+	// The defaults fit gormrepo: exported T学生Columns, the recv "c", type-checked columns
+	options := gormcngen.NewOptions()
 
 	// Create configuration and generate code to target file
 	cfg := gormcngen.NewConfigs(objects, options, absPath)
