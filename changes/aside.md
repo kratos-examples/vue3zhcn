@@ -56,6 +56,7 @@ cd vue3project && tree --noreport
 |   |   |-- demo1
 |   |   |   |-- google
 |   |   |   |   |-- api
+|   |   |   |   |   |-- field_behavior.ts
 |   |   |   |   |   `-- http.ts
 |   |   |   |   `-- protobuf
 |   |   |   |       `-- descriptor.ts
@@ -70,6 +71,7 @@ cd vue3project && tree --noreport
 |   |       |   `-- reason_enum.ts
 |   |       `-- google
 |   |           |-- api
+|   |           |   |-- field_behavior.ts
 |   |           |   `-- http.ts
 |   |           `-- protobuf
 |   |               `-- descriptor.ts

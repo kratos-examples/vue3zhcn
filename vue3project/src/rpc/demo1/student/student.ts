@@ -227,7 +227,7 @@ export const StudentInfo = new StudentInfo$Type();
 class CreateStudentRequest$Type extends MessageType<CreateStudentRequest> {
     constructor() {
         super("student.CreateStudentRequest", [
-            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
             { no: 2, name: "age", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
             { no: 3, name: "class_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
@@ -336,8 +336,8 @@ export const CreateStudentReply = new CreateStudentReply$Type();
 class UpdateStudentRequest$Type extends MessageType<UpdateStudentRequest> {
     constructor() {
         super("student.UpdateStudentRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ },
-            { no: 2, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
+            { no: 2, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
             { no: 3, name: "age", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
             { no: 4, name: "class_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
@@ -453,7 +453,7 @@ export const UpdateStudentReply = new UpdateStudentReply$Type();
 class DeleteStudentRequest$Type extends MessageType<DeleteStudentRequest> {
     constructor() {
         super("student.DeleteStudentRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<DeleteStudentRequest>): DeleteStudentRequest {
@@ -547,7 +547,7 @@ export const DeleteStudentReply = new DeleteStudentReply$Type();
 class GetStudentRequest$Type extends MessageType<GetStudentRequest> {
     constructor() {
         super("student.GetStudentRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<GetStudentRequest>): GetStudentRequest {

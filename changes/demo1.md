@@ -74,7 +74,7 @@ Code differences compared to source project.
  	"github.com/go-kratos/kratos/contrib/otel/v3/tracing"
  	"github.com/go-kratos/kratos/v3"
  	"github.com/go-kratos/kratos/v3/config"
-@@ -32,6 +33,16 @@
+@@ -31,6 +32,16 @@
  
  func init() {
  	flag.StringVar(&flagconf, "conf", "./configs", "config path, eg: -conf config.yaml")
@@ -96,7 +96,7 @@ Code differences compared to source project.
 ## cmd/demo1kratos/wire_gen.go (+4 -4)
 
 ```diff
-@@ -28,14 +28,14 @@
+@@ -24,14 +24,14 @@
  	if err != nil {
  		return nil, nil, err
  	}
@@ -581,7 +581,7 @@ Code differences compared to source project.
 ## internal/server/grpc.go (+1 -1)
 
 ```diff
-@@ -10,7 +10,7 @@
+@@ -11,7 +11,7 @@
  	"github.com/yylego/kratos-examples/demo1kratos/internal/service"
  )
  
@@ -595,7 +595,7 @@ Code differences compared to source project.
 ## internal/server/http.go (+1 -1)
 
 ```diff
-@@ -10,7 +10,7 @@
+@@ -11,7 +11,7 @@
  	"github.com/yylego/kratos-examples/demo1kratos/internal/service"
  )
  

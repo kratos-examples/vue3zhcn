@@ -244,9 +244,9 @@ export const ArticleInfo = new ArticleInfo$Type();
 class CreateArticleRequest$Type extends MessageType<CreateArticleRequest> {
     constructor() {
         super("article.CreateArticleRequest", [
-            { no: 1, name: "title", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 1, name: "title", kind: "scalar", T: 9 /*ScalarType.STRING*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
             { no: 2, name: "content", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 3, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<CreateArticleRequest>): CreateArticleRequest {
@@ -353,10 +353,10 @@ export const CreateArticleReply = new CreateArticleReply$Type();
 class UpdateArticleRequest$Type extends MessageType<UpdateArticleRequest> {
     constructor() {
         super("article.UpdateArticleRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ },
-            { no: 2, name: "title", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
+            { no: 2, name: "title", kind: "scalar", T: 9 /*ScalarType.STRING*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
             { no: 3, name: "content", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 4, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<UpdateArticleRequest>): UpdateArticleRequest {
@@ -470,7 +470,7 @@ export const UpdateArticleReply = new UpdateArticleReply$Type();
 class DeleteArticleRequest$Type extends MessageType<DeleteArticleRequest> {
     constructor() {
         super("article.DeleteArticleRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<DeleteArticleRequest>): DeleteArticleRequest {
@@ -564,7 +564,7 @@ export const DeleteArticleReply = new DeleteArticleReply$Type();
 class GetArticleRequest$Type extends MessageType<GetArticleRequest> {
     constructor() {
         super("article.GetArticleRequest", [
-            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+            { no: 1, name: "id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } }
         ]);
     }
     create(value?: PartialMessage<GetArticleRequest>): GetArticleRequest {
@@ -712,7 +712,7 @@ export const ListArticlesRequest = new ListArticlesRequest$Type();
 class ListStudentArticlesRequest$Type extends MessageType<ListStudentArticlesRequest> {
     constructor() {
         super("article.ListStudentArticlesRequest", [
-            { no: 1, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/ },
+            { no: 1, name: "student_id", kind: "scalar", T: 3 /*ScalarType.INT64*/, options: { "google.api.field_behavior": ["REQUIRED"] } },
             { no: 2, name: "page", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
             { no: 3, name: "page_size", kind: "scalar", T: 5 /*ScalarType.INT32*/ }
         ]);
