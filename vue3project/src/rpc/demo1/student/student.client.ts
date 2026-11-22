@@ -6,6 +6,7 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { StudentService } from "./student";
+import type { DuplexStreamingCall } from "@protobuf-ts/runtime-rpc";
 import type { ListStudentsReply } from "./student";
 import type { ListStudentsRequest } from "./student";
 import type { GetStudentReply } from "./student";
@@ -19,8 +20,8 @@ import type { CreateStudentReply } from "./student";
 import type { CreateStudentRequest } from "./student";
 import type { UnaryCall } from "@protobuf-ts/runtime-rpc";
 import type { RpcOptions } from "@protobuf-ts/runtime-rpc";
-import { executeGrpcToHttp } from '@yylego/grpc-to-http';
-import type { GrpcToHttpPromise } from '@yylego/grpc-to-http';
+import { executeGrpcToHttp, executeGrpcToHttpWebSocket } from '@yylego/grpc-to-http';
+import type { GrpcToHttpPromise, GrpcToHttpWebSocket } from '@yylego/grpc-to-http';
 /**
  * @generated from protobuf service student.StudentService
  */
@@ -45,6 +46,13 @@ export interface IStudentServiceClient {
      * @generated from protobuf rpc: ListStudents
      */
     listStudents(input: ListStudentsRequest, options?: RpcOptions): GrpcToHttpPromise<ListStudentsRequest, ListStudentsReply>;
+    /**
+     * Keeps one connection open: each student id sent in gets that student back.
+     * Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+     *
+     * @generated from protobuf rpc: LookupStudents
+     */
+    lookupStudents(options?: RpcOptions): GrpcToHttpWebSocket<GetStudentRequest, GetStudentReply>;
 }
 /**
  * @generated from protobuf service student.StudentService
@@ -89,5 +97,15 @@ export class StudentServiceClient implements IStudentServiceClient, ServiceInfo 
     listStudents(input: ListStudentsRequest, options?: RpcOptions): GrpcToHttpPromise<ListStudentsRequest, ListStudentsReply> {
         const method = this.methods[4], opt = this._transport.mergeOptions(options);
         return executeGrpcToHttp<ListStudentsRequest, ListStudentsReply>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * Keeps one connection open: each student id sent in gets that student back.
+     * Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+     *
+     * @generated from protobuf rpc: LookupStudents
+     */
+    lookupStudents(options?: RpcOptions): GrpcToHttpWebSocket<GetStudentRequest, GetStudentReply> {
+        const method = this.methods[5], opt = this._transport.mergeOptions(options);
+        return executeGrpcToHttpWebSocket<GetStudentRequest, GetStudentReply>(method, opt);
     }
 }

@@ -625,14 +625,15 @@ const file_student_student_proto_rawDesc = "" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\"[\n" +
 	"\x11ListStudentsReply\x120\n" +
 	"\bstudents\x18\x01 \x03(\v2\x14.student.StudentInfoR\bstudents\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x05R\x05count2\xf9\x03\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count2\xe6\x04\n" +
 	"\x0eStudentService\x12a\n" +
 	"\rCreateStudent\x12\x1d.student.CreateStudentRequest\x1a\x1b.student.CreateStudentReply\"\x14\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/students\x12f\n" +
 	"\rUpdateStudent\x12\x1d.student.UpdateStudentRequest\x1a\x1b.student.UpdateStudentReply\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\x1a\x0e/students/{id}\x12c\n" +
 	"\rDeleteStudent\x12\x1d.student.DeleteStudentRequest\x1a\x1b.student.DeleteStudentReply\"\x16\x82\xd3\xe4\x93\x02\x10*\x0e/students/{id}\x12Z\n" +
 	"\n" +
 	"GetStudent\x12\x1a.student.GetStudentRequest\x1a\x18.student.GetStudentReply\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/students/{id}\x12[\n" +
-	"\fListStudents\x12\x1c.student.ListStudentsRequest\x1a\x1a.student.ListStudentsReply\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/studentsB!Z\x1fdemo1kratos/api/student;studentb\x06proto3"
+	"\fListStudents\x12\x1c.student.ListStudentsRequest\x1a\x1a.student.ListStudentsReply\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/students\x12k\n" +
+	"\x0eLookupStudents\x12\x1a.student.GetStudentRequest\x1a\x18.student.GetStudentReply\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/students/lookup/stream(\x010\x01B!Z\x1fdemo1kratos/api/student;studentb\x06proto3"
 
 var (
 	file_student_student_proto_rawDescOnce sync.Once
@@ -670,13 +671,15 @@ var file_student_student_proto_depIdxs = []int32{
 	5,  // 6: student.StudentService.DeleteStudent:input_type -> student.DeleteStudentRequest
 	7,  // 7: student.StudentService.GetStudent:input_type -> student.GetStudentRequest
 	9,  // 8: student.StudentService.ListStudents:input_type -> student.ListStudentsRequest
-	2,  // 9: student.StudentService.CreateStudent:output_type -> student.CreateStudentReply
-	4,  // 10: student.StudentService.UpdateStudent:output_type -> student.UpdateStudentReply
-	6,  // 11: student.StudentService.DeleteStudent:output_type -> student.DeleteStudentReply
-	8,  // 12: student.StudentService.GetStudent:output_type -> student.GetStudentReply
-	10, // 13: student.StudentService.ListStudents:output_type -> student.ListStudentsReply
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
+	7,  // 9: student.StudentService.LookupStudents:input_type -> student.GetStudentRequest
+	2,  // 10: student.StudentService.CreateStudent:output_type -> student.CreateStudentReply
+	4,  // 11: student.StudentService.UpdateStudent:output_type -> student.UpdateStudentReply
+	6,  // 12: student.StudentService.DeleteStudent:output_type -> student.DeleteStudentReply
+	8,  // 13: student.StudentService.GetStudent:output_type -> student.GetStudentReply
+	10, // 14: student.StudentService.ListStudents:output_type -> student.ListStudentsReply
+	8,  // 15: student.StudentService.LookupStudents:output_type -> student.GetStudentReply
+	10, // [10:16] is the sub-list for method output_type
+	4,  // [4:10] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name
 	4,  // [4:4] is the sub-list for extension extendee
 	0,  // [0:4] is the sub-list for field type_name

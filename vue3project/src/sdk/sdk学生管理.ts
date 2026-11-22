@@ -1,13 +1,9 @@
 import type { RpcTransport } from '@protobuf-ts/runtime-rpc'
+import type { GrpcToHttpWebSocket } from '@yylego/grpc-to-http'
 
 import { StudentServiceClient } from '../rpc/demo1/student/student.client'
-import {
-    CreateStudentRequest,
-    UpdateStudentRequest,
-    DeleteStudentRequest,
-    GetStudentRequest,
-    ListStudentsRequest,
-} from '../rpc/demo1/student/student'
+import { CreateStudentRequest, UpdateStudentRequest, DeleteStudentRequest, GetStudentRequest, ListStudentsRequest } from '../rpc/demo1/student/student'
+import type { GetStudentReply } from '../rpc/demo1/student/student'
 
 // ========================== 请求类型定义 ==========================
 
@@ -67,6 +63,36 @@ export interface Res学生列表 {
     s总数: number
 }
 
+// ========================== 实时查询连接 ==========================
+
+// Conn学生查询 包着双向流式的 LookupStudents：一条 WebSocket 连接上每发一个编号，就回来那个学生，用 for await 逐条读
+export class Conn学生查询 implements AsyncIterable<Res获取学生> {
+    private rpc连接: GrpcToHttpWebSocket<GetStudentRequest, GetStudentReply>
+
+    constructor(rpc连接: GrpcToHttpWebSocket<GetStudentRequest, GetStudentReply>) {
+        this.rpc连接 = rpc连接
+    }
+
+    act发送编号(req: Req获取学生): void {
+        this.rpc连接.send(GetStudentRequest.create({ id: req.v编号 }))
+    }
+
+    // 告诉服务端不再发编号，服务端返回后正常关闭连接
+    act结束发送(): void {
+        this.rpc连接.closeSend()
+    }
+
+    act关闭连接(): void {
+        this.rpc连接.close()
+    }
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<Res获取学生, void, undefined> {
+        for await (const reply of this.rpc连接) {
+            yield { s学生: cnv学生信息(reply.student) }
+        }
+    }
+}
+
 // ========================== SDK 类定义 ==========================
 
 function cnv学生信息(s: { id: string; name: string; age: number; className: string } | undefined): T学生信息 | undefined {
@@ -112,18 +138,12 @@ export class Sdk学生管理 {
     }
 
     async act删除学生(req: Req删除学生): Promise<Res删除成功> {
-        const res = await this.rpc客户端.deleteStudent(
-            DeleteStudentRequest.create({ id: req.v编号 }),
-            {},
-        )
+        const res = await this.rpc客户端.deleteStudent(DeleteStudentRequest.create({ id: req.v编号 }), {})
         return { b成功: res.data.success }
     }
 
     async act获取学生(req: Req获取学生): Promise<Res获取学生> {
-        const res = await this.rpc客户端.getStudent(
-            GetStudentRequest.create({ id: req.v编号 }),
-            {},
-        )
+        const res = await this.rpc客户端.getStudent(GetStudentRequest.create({ id: req.v编号 }), {})
         return { s学生: cnv学生信息(res.data.student) }
     }
 
@@ -139,5 +159,9 @@ export class Sdk学生管理 {
             s学生列表: res.data.students.map((s) => cnv学生信息(s)!),
             s总数: res.data.count,
         }
+    }
+
+    act连接查询(): Conn学生查询 {
+        return new Conn学生查询(this.rpc客户端.lookupStudents())
     }
 }

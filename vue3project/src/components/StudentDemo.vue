@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, nextTick, onMounted } from 'vue'
+import { ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { sdk学生管理 } from '../sdk'
-import type { T学生信息 } from '../sdk'
+import type { Conn学生查询, T学生信息 } from '../sdk'
 import { ErrorReason } from '../rpc/demo1/student/reason_enum'
 import { parseCause, showCauseDialog } from '../utils/cause'
 import { showSuccess, showWarning } from '../utils/message'
@@ -166,6 +166,60 @@ async function act删除学生(v编号: string) {
     }
     b加载中.value = false
 }
+
+// 实时查询：双向流式的 LookupStudents 走一条 WebSocket 连接，每发一个编号就回来那个学生
+let conn查询: Conn学生查询 | undefined
+const b查询在线 = ref(false)
+const v查询编号 = ref('')
+const a查询结果 = ref<T学生信息[]>([])
+
+async function act读取结果(conn: Conn学生查询) {
+    try {
+        for await (const res of conn) {
+            if (res.s学生) {
+                a查询结果.value.unshift(res.s学生)
+                act记录日志(`实时查询: 编号=${res.s学生.s编号}, 名字=${res.s学生.s名字}`)
+            }
+        }
+        act记录日志('查询连接已关闭')
+    } catch (caught: unknown) {
+        // 查询失败时服务端结束这条流，连接带着 Kratos 的错误关闭
+        const cause = parseCause(caught)
+        if (cause.reason === ErrorReason[ErrorReason.STUDENT_NOT_FOUND]) {
+            showWarning('学生不存在，连接已关闭，请重新连接')
+        } else {
+            showCauseDialog(caught)
+        }
+        act记录日志(`实时查询失败: ${caught}`)
+    }
+    if (conn查询 === conn) {
+        conn查询 = undefined
+        b查询在线.value = false
+    }
+}
+
+function act打开连接() {
+    a查询结果.value = []
+    conn查询 = sdk学生管理.act连接查询()
+    b查询在线.value = true
+    act记录日志('查询连接已打开')
+    act读取结果(conn查询)
+}
+
+function act发送编号() {
+    const v编号 = v查询编号.value.trim()
+    if (!conn查询 || v编号 === '') return
+    conn查询.act发送编号({ v编号 })
+    act记录日志(`查询发送: 编号=${v编号}`)
+}
+
+function act断开连接() {
+    conn查询?.act结束发送()
+}
+
+onBeforeUnmount(() => {
+    conn查询?.act关闭连接()
+})
 </script>
 
 <template>
@@ -193,13 +247,34 @@ async function act删除学生(v编号: string) {
                     <template #default="{ row }">
                         <el-button size="small" @click="act查看学生(row.s编号)" :disabled="b加载中">查看</el-button>
                         <el-button size="small" @click="act打开更新弹窗(row)" :disabled="b加载中">编辑</el-button>
-                        <el-button size="small" type="danger" @click="act删除学生(row.s编号)" :disabled="b加载中"
-                            >删除</el-button
-                        >
+                        <el-button size="small" type="danger" @click="act删除学生(row.s编号)" :disabled="b加载中">删除</el-button>
                     </template>
                 </el-table-column>
             </el-table>
             <div v-else class="empty-hint">暂无学生记录，点击创建添加</div>
+        </div>
+
+        <!-- 实时查询（WebSocket） -->
+        <div class="list-card">
+            <div class="list-header">
+                <h3>实时查询</h3>
+                <div class="header-actions">
+                    <el-tag :type="b查询在线 ? 'success' : 'info'" size="small">{{ b查询在线 ? '在线' : '离线' }}</el-tag>
+                    <el-button v-if="!b查询在线" type="primary" @click="act打开连接" size="small">连接</el-button>
+                    <el-button v-else @click="act断开连接" size="small">断开</el-button>
+                </div>
+            </div>
+            <div class="lookup-bar">
+                <el-input v-model="v查询编号" placeholder="学生编号" size="small" :disabled="!b查询在线" @keyup.enter="act发送编号" />
+                <el-button type="primary" @click="act发送编号" size="small" :disabled="!b查询在线">发送</el-button>
+            </div>
+            <el-table :data="a查询结果" stripe border v-if="a查询结果.length > 0">
+                <el-table-column prop="s编号" label="编号" width="80" align="center" />
+                <el-table-column prop="s名字" label="名字" align="center" />
+                <el-table-column prop="s年龄" label="年龄" width="80" align="center" />
+                <el-table-column prop="s班级" label="班级" align="center" />
+            </el-table>
+            <div v-else class="empty-hint">连接后发送学生编号，结果从同一条连接逐条返回</div>
         </div>
 
         <!-- 创建弹窗 -->
@@ -222,12 +297,7 @@ async function act删除学生(v编号: string) {
         </el-dialog>
 
         <!-- 更新弹窗 -->
-        <el-dialog
-            v-model="b显示更新弹窗"
-            :title="`更新学生 (编号: ${v更新表单.v编号})`"
-            width="420"
-            :close-on-click-modal="false"
-        >
+        <el-dialog v-model="b显示更新弹窗" :title="`更新学生 (编号: ${v更新表单.v编号})`" width="420" :close-on-click-modal="false">
             <el-form ref="ref更新表单" :model="v更新表单" :rules="v更新规则" label-width="80px">
                 <el-form-item label="名字" prop="v名字">
                     <el-input v-model="v更新表单.v名字" placeholder="请输入名字" />
@@ -304,6 +374,11 @@ async function act删除学生(v编号: string) {
 .header-actions {
     display: flex;
     gap: 8px;
+}
+.lookup-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
 }
 .empty-hint {
     color: #c0c4cc;

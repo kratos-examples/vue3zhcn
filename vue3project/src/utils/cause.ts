@@ -42,10 +42,7 @@ export function showCauseDialog(caught: unknown) {
     const info = parseCause(caught)
     ElMessageBox({
         title: info.httpCode === 0 ? 'Network Error' : `Error (${info.httpCode})`,
-        message: h('div', { style: 'font-size:14px' }, [
-            h('p', { style: 'margin:0 0 8px 0;color:#606266' }, [h('b', 'Reason: '), info.reason]),
-            h('p', { style: 'margin:0;color:#909399;word-break:break-all' }, info.message),
-        ]),
+        message: h('div', { style: 'font-size:14px' }, [h('p', { style: 'margin:0 0 8px 0;color:#606266' }, [h('b', 'Reason: '), info.reason]), h('p', { style: 'margin:0;color:#909399;word-break:break-all' }, info.message)]),
         confirmButtonText: 'OK',
         type: 'warning',
     })

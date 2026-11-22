@@ -46,6 +46,26 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/student.CreateStudentReply'
+    /students/lookup/stream:
+        get:
+            tags:
+                - StudentService
+            description: |-
+                Keeps one connection open: each student id sent in gets that student back.
+                 Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+            operationId: StudentService_LookupStudents
+            parameters:
+                - name: id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/student.GetStudentReply'
     /students/{id}:
         get:
             tags:

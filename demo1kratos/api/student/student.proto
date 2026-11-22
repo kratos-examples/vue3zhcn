@@ -33,6 +33,12 @@ service StudentService {
   rpc ListStudents(ListStudentsRequest) returns (ListStudentsReply) {
     option (google.api.http) = {get: "/students"};
   }
+
+  // Keeps one connection open: each student id sent in gets that student back.
+  // Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+  rpc LookupStudents(stream GetStudentRequest) returns (stream GetStudentReply) {
+    option (google.api.http) = {get: "/students/lookup/stream"};
+  }
 }
 
 message StudentInfo {

@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/yylego/done v0.0.0
-	github.com/yylego/kratos-ts-http v0.0.1
+	github.com/yylego/kratos-ts-http v0.0.2
 	github.com/yylego/osexistpath v0.0.0
 	github.com/yylego/runpath v0.0.7
 	github.com/yylego/zaplog v0.0.2

@@ -9,30 +9,8 @@ export { sdk学生管理, sdk文章管理 } from './client'
 
 // ========================== 学生管理类型导出 ==========================
 
-export type {
-    Req创建学生,
-    Req更新学生,
-    Req删除学生,
-    Req获取学生,
-    Req学生列表,
-    T学生信息,
-    Res创建学生,
-    Res更新学生,
-    Res获取学生,
-    Res学生列表,
-} from './sdk学生管理'
+export type { Req创建学生, Req更新学生, Req删除学生, Req获取学生, Req学生列表, T学生信息, Res创建学生, Res更新学生, Res获取学生, Res学生列表, Conn学生查询 } from './sdk学生管理'
 
 // ========================== 文章管理类型导出 ==========================
 
-export type {
-    Req创建文章,
-    Req更新文章,
-    Req删除文章,
-    Req获取文章,
-    Req文章列表,
-    T文章信息,
-    Res创建文章,
-    Res更新文章,
-    Res获取文章,
-    Res文章列表,
-} from './sdk文章管理'
+export type { Req创建文章, Req更新文章, Req删除文章, Req获取文章, Req文章列表, T文章信息, Res创建文章, Res更新文章, Res获取文章, Res文章列表 } from './sdk文章管理'

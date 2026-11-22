@@ -21,6 +21,7 @@ const OperationStudentServiceCreateStudent = "/student.StudentService/CreateStud
 const OperationStudentServiceDeleteStudent = "/student.StudentService/DeleteStudent"
 const OperationStudentServiceGetStudent = "/student.StudentService/GetStudent"
 const OperationStudentServiceListStudents = "/student.StudentService/ListStudents"
+const OperationStudentServiceLookupStudents = "/student.StudentService/LookupStudents"
 const OperationStudentServiceUpdateStudent = "/student.StudentService/UpdateStudent"
 
 type StudentServiceHTTPServer interface {
@@ -28,6 +29,9 @@ type StudentServiceHTTPServer interface {
 	DeleteStudent(context.Context, *DeleteStudentRequest) (*DeleteStudentReply, error)
 	GetStudent(context.Context, *GetStudentRequest) (*GetStudentReply, error)
 	ListStudents(context.Context, *ListStudentsRequest) (*ListStudentsReply, error)
+	// LookupStudents Keeps one connection open: each student id sent in gets that student back.
+	// Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+	LookupStudents(StudentService_LookupStudentsServer) error
 	UpdateStudent(context.Context, *UpdateStudentRequest) (*UpdateStudentReply, error)
 }
 
@@ -38,6 +42,22 @@ func RegisterStudentServiceHTTPServer(s *http.Server, srv StudentServiceHTTPServ
 	r.Handle("DELETE", "/students/{id}", _StudentService_DeleteStudent0_HTTP_Handler(srv))
 	r.Handle("GET", "/students/{id}", _StudentService_GetStudent0_HTTP_Handler(srv))
 	r.Handle("GET", "/students", _StudentService_ListStudents0_HTTP_Handler(srv))
+	r.Handle("GET", "/students/lookup/stream", _StudentService_LookupStudents0_HTTP_Handler(srv))
+}
+
+type StudentService_LookupStudentsHTTPServer struct {
+	http.ServerStream
+}
+
+func (x *StudentService_LookupStudentsHTTPServer) Send(m *GetStudentReply) error {
+	return x.ServerStream.Send(m)
+}
+func (x *StudentService_LookupStudentsHTTPServer) Recv() (*GetStudentRequest, error) {
+	m := new(GetStudentRequest)
+	if err := x.ServerStream.Recv(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _StudentService_CreateStudent0_HTTP_Handler(srv StudentServiceHTTPServer) func(ctx http.Context) error {
@@ -144,11 +164,30 @@ func _StudentService_ListStudents0_HTTP_Handler(srv StudentServiceHTTPServer) fu
 	}
 }
 
+func _StudentService_LookupStudents0_HTTP_Handler(srv StudentServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		stream, err := http.NewWebSocketServerStream(ctx)
+		if err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationStudentServiceLookupStudents)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			stream.SetContext(ctx)
+			return nil, srv.LookupStudents(&StudentService_LookupStudentsHTTPServer{ServerStream: stream})
+		})
+		_, err = h(ctx, nil)
+		return stream.Close(err)
+	}
+}
+
 type StudentServiceHTTPClient interface {
 	CreateStudent(ctx context.Context, req *CreateStudentRequest, opts ...http.CallOption) (rsp *CreateStudentReply, err error)
 	DeleteStudent(ctx context.Context, req *DeleteStudentRequest, opts ...http.CallOption) (rsp *DeleteStudentReply, err error)
 	GetStudent(ctx context.Context, req *GetStudentRequest, opts ...http.CallOption) (rsp *GetStudentReply, err error)
 	ListStudents(ctx context.Context, req *ListStudentsRequest, opts ...http.CallOption) (rsp *ListStudentsReply, err error)
+	// LookupStudents Keeps one connection open: each student id sent in gets that student back.
+	// Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+	LookupStudents(ctx context.Context, opts ...http.CallOption) (StudentService_LookupStudentsClient, error)
 	UpdateStudent(ctx context.Context, req *UpdateStudentRequest, opts ...http.CallOption) (rsp *UpdateStudentReply, err error)
 }
 
@@ -158,6 +197,52 @@ type StudentServiceHTTPClientImpl struct {
 
 func NewStudentServiceHTTPClient(client *http.Client) StudentServiceHTTPClient {
 	return &StudentServiceHTTPClientImpl{client}
+}
+
+type StudentService_LookupStudentsHTTPClient struct {
+	http.ClientStream
+	ctx     context.Context
+	cc      *http.Client
+	pattern string
+	opts    []http.CallOption
+}
+
+func (x *StudentService_LookupStudentsHTTPClient) open(m *GetStudentRequest) error {
+	if x.ClientStream != nil {
+		return nil
+	}
+	opts := x.opts
+	path := http.BuildPath(x.pattern, m, http.WithQueryParams())
+	stream, err := x.cc.WebSocket(x.ctx, path, opts...)
+	if err != nil {
+		return err
+	}
+	x.ClientStream = stream
+	return nil
+}
+
+func (x *StudentService_LookupStudentsHTTPClient) CloseSend() error {
+	if err := x.open(nil); err != nil {
+		return err
+	}
+	return x.ClientStream.CloseSend()
+}
+
+func (x *StudentService_LookupStudentsHTTPClient) Send(m *GetStudentRequest) error {
+	if err := x.open(m); err != nil {
+		return err
+	}
+	return x.ClientStream.Send(m)
+}
+func (x *StudentService_LookupStudentsHTTPClient) Recv() (*GetStudentReply, error) {
+	if err := x.open(nil); err != nil {
+		return nil, err
+	}
+	m := new(GetStudentReply)
+	if err := x.ClientStream.Recv(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *StudentServiceHTTPClientImpl) CreateStudent(ctx context.Context, in *CreateStudentRequest, opts ...http.CallOption) (*CreateStudentReply, error) {
@@ -223,6 +308,19 @@ func (c *StudentServiceHTTPClientImpl) ListStudents(ctx context.Context, in *Lis
 		return nil, err
 	}
 	return &out, nil
+}
+
+// LookupStudents Keeps one connection open: each student id sent in gets that student back.
+// Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+func (c *StudentServiceHTTPClientImpl) LookupStudents(ctx context.Context, opts ...http.CallOption) (StudentService_LookupStudentsClient, error) {
+	pattern := "/students/lookup/stream"
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationStudentServiceLookupStudents),
+		http.PathTemplate(pattern),
+	}, opts...)
+	return &StudentService_LookupStudentsHTTPClient{ctx: ctx, cc: c.cc, pattern: pattern, opts: opts}, nil
 }
 
 func (c *StudentServiceHTTPClientImpl) UpdateStudent(ctx context.Context, in *UpdateStudentRequest, opts ...http.CallOption) (*UpdateStudentReply, error) {

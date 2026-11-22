@@ -754,5 +754,6 @@ export const StudentService = new ServiceType("student.StudentService", [
     { name: "UpdateStudent", options: { "google.api.http": { put: "/students/{id}", body: "*" } }, I: UpdateStudentRequest, O: UpdateStudentReply },
     { name: "DeleteStudent", options: { "google.api.http": { delete: "/students/{id}" } }, I: DeleteStudentRequest, O: DeleteStudentReply },
     { name: "GetStudent", options: { "google.api.http": { get: "/students/{id}" } }, I: GetStudentRequest, O: GetStudentReply },
-    { name: "ListStudents", options: { "google.api.http": { get: "/students" } }, I: ListStudentsRequest, O: ListStudentsReply }
+    { name: "ListStudents", options: { "google.api.http": { get: "/students" } }, I: ListStudentsRequest, O: ListStudentsReply },
+    { name: "LookupStudents", serverStreaming: true, clientStreaming: true, options: { "google.api.http": { get: "/students/lookup/stream" } }, I: GetStudentRequest, O: GetStudentReply }
 ]);

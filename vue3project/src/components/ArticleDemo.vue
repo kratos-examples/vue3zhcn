@@ -197,9 +197,7 @@ async function act删除文章(v编号: string) {
                     <template #default="{ row }">
                         <el-button size="small" @click="act查看文章(row.s编号)" :disabled="b加载中">查看</el-button>
                         <el-button size="small" @click="act打开更新弹窗(row)" :disabled="b加载中">编辑</el-button>
-                        <el-button size="small" type="danger" @click="act删除文章(row.s编号)" :disabled="b加载中"
-                            >删除</el-button
-                        >
+                        <el-button size="small" type="danger" @click="act删除文章(row.s编号)" :disabled="b加载中">删除</el-button>
                     </template>
                 </el-table-column>
             </el-table>
@@ -226,12 +224,7 @@ async function act删除文章(v编号: string) {
         </el-dialog>
 
         <!-- 更新弹窗 -->
-        <el-dialog
-            v-model="b显示更新弹窗"
-            :title="`更新文章 (编号: ${v更新表单.v编号})`"
-            width="420"
-            :close-on-click-modal="false"
-        >
+        <el-dialog v-model="b显示更新弹窗" :title="`更新文章 (编号: ${v更新表单.v编号})`" width="420" :close-on-click-modal="false">
             <el-form ref="ref更新表单" :model="v更新表单" :rules="v更新规则" label-width="90px">
                 <el-form-item label="标题" prop="v标题">
                     <el-input v-model="v更新表单.v标题" placeholder="请输入标题" />

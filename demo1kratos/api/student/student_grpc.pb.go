@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StudentService_CreateStudent_FullMethodName = "/student.StudentService/CreateStudent"
-	StudentService_UpdateStudent_FullMethodName = "/student.StudentService/UpdateStudent"
-	StudentService_DeleteStudent_FullMethodName = "/student.StudentService/DeleteStudent"
-	StudentService_GetStudent_FullMethodName    = "/student.StudentService/GetStudent"
-	StudentService_ListStudents_FullMethodName  = "/student.StudentService/ListStudents"
+	StudentService_CreateStudent_FullMethodName  = "/student.StudentService/CreateStudent"
+	StudentService_UpdateStudent_FullMethodName  = "/student.StudentService/UpdateStudent"
+	StudentService_DeleteStudent_FullMethodName  = "/student.StudentService/DeleteStudent"
+	StudentService_GetStudent_FullMethodName     = "/student.StudentService/GetStudent"
+	StudentService_ListStudents_FullMethodName   = "/student.StudentService/ListStudents"
+	StudentService_LookupStudents_FullMethodName = "/student.StudentService/LookupStudents"
 )
 
 // StudentServiceClient is the client API for StudentService service.
@@ -35,6 +36,9 @@ type StudentServiceClient interface {
 	DeleteStudent(ctx context.Context, in *DeleteStudentRequest, opts ...grpc.CallOption) (*DeleteStudentReply, error)
 	GetStudent(ctx context.Context, in *GetStudentRequest, opts ...grpc.CallOption) (*GetStudentReply, error)
 	ListStudents(ctx context.Context, in *ListStudentsRequest, opts ...grpc.CallOption) (*ListStudentsReply, error)
+	// Keeps one connection open: each student id sent in gets that student back.
+	// Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+	LookupStudents(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[GetStudentRequest, GetStudentReply], error)
 }
 
 type studentServiceClient struct {
@@ -95,6 +99,19 @@ func (c *studentServiceClient) ListStudents(ctx context.Context, in *ListStudent
 	return out, nil
 }
 
+func (c *studentServiceClient) LookupStudents(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[GetStudentRequest, GetStudentReply], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &StudentService_ServiceDesc.Streams[0], StudentService_LookupStudents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetStudentRequest, GetStudentReply]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type StudentService_LookupStudentsClient = grpc.BidiStreamingClient[GetStudentRequest, GetStudentReply]
+
 // StudentServiceServer is the server API for StudentService service.
 // All implementations must embed UnimplementedStudentServiceServer
 // for forward compatibility.
@@ -104,6 +121,9 @@ type StudentServiceServer interface {
 	DeleteStudent(context.Context, *DeleteStudentRequest) (*DeleteStudentReply, error)
 	GetStudent(context.Context, *GetStudentRequest) (*GetStudentReply, error)
 	ListStudents(context.Context, *ListStudentsRequest) (*ListStudentsReply, error)
+	// Keeps one connection open: each student id sent in gets that student back.
+	// Kratos v3 serves this duplex method through HTTP as a WebSocket on a GET route.
+	LookupStudents(grpc.BidiStreamingServer[GetStudentRequest, GetStudentReply]) error
 	mustEmbedUnimplementedStudentServiceServer()
 }
 
@@ -128,6 +148,9 @@ func (UnimplementedStudentServiceServer) GetStudent(context.Context, *GetStudent
 }
 func (UnimplementedStudentServiceServer) ListStudents(context.Context, *ListStudentsRequest) (*ListStudentsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListStudents not implemented")
+}
+func (UnimplementedStudentServiceServer) LookupStudents(grpc.BidiStreamingServer[GetStudentRequest, GetStudentReply]) error {
+	return status.Error(codes.Unimplemented, "method LookupStudents not implemented")
 }
 func (UnimplementedStudentServiceServer) mustEmbedUnimplementedStudentServiceServer() {}
 func (UnimplementedStudentServiceServer) testEmbeddedByValue()                        {}
@@ -240,6 +263,13 @@ func _StudentService_ListStudents_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StudentService_LookupStudents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(StudentServiceServer).LookupStudents(&grpc.GenericServerStream[GetStudentRequest, GetStudentReply]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type StudentService_LookupStudentsServer = grpc.BidiStreamingServer[GetStudentRequest, GetStudentReply]
+
 // StudentService_ServiceDesc is the grpc.ServiceDesc for StudentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -268,6 +298,13 @@ var StudentService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _StudentService_ListStudents_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "LookupStudents",
+			Handler:       _StudentService_LookupStudents_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "student/student.proto",
 }

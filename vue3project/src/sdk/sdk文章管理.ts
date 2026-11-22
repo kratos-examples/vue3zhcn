@@ -1,13 +1,7 @@
 import type { RpcTransport } from '@protobuf-ts/runtime-rpc'
 
 import { ArticleServiceClient } from '../rpc/demo2/article/article.client'
-import {
-    CreateArticleRequest,
-    UpdateArticleRequest,
-    DeleteArticleRequest,
-    GetArticleRequest,
-    ListArticlesRequest,
-} from '../rpc/demo2/article/article'
+import { CreateArticleRequest, UpdateArticleRequest, DeleteArticleRequest, GetArticleRequest, ListArticlesRequest } from '../rpc/demo2/article/article'
 
 // ========================== 请求类型定义 ==========================
 
@@ -112,18 +106,12 @@ export class Sdk文章管理 {
     }
 
     async act删除文章(req: Req删除文章): Promise<Res删除成功> {
-        const res = await this.rpc客户端.deleteArticle(
-            DeleteArticleRequest.create({ id: req.v编号 }),
-            {},
-        )
+        const res = await this.rpc客户端.deleteArticle(DeleteArticleRequest.create({ id: req.v编号 }), {})
         return { b成功: res.data.success }
     }
 
     async act获取文章(req: Req获取文章): Promise<Res获取文章> {
-        const res = await this.rpc客户端.getArticle(
-            GetArticleRequest.create({ id: req.v编号 }),
-            {},
-        )
+        const res = await this.rpc客户端.getArticle(GetArticleRequest.create({ id: req.v编号 }), {})
         return { s文章: cnv文章信息(res.data.article) }
     }
 
